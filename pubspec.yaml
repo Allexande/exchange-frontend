@@ -1,0 +1,56 @@
+name: exchange
+description: "A new Flutter project."
+
+publish_to: 'none'
+
+
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.3.3 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.6
+  flutter_svg: ^1.0.0
+  http: ^1.2.1
+  intl: ^0.19.0
+  shared_preferences: ^2.2.3
+  image_picker: ^1.1.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - build/assets/images/
+
+  fonts:
+    - family: BloggerSans
+      fonts:
+        - asset: build/assets/fonts/bloggersans/Blogger-Sans.otf
+        
+        - asset: build/assets/fonts/bloggersans/Blogger-Sans-Bold.otf
+          weight: 700
+        - asset: build/assets/fonts/bloggersans/Blogger-Sans-Italic.otf
+          style: italic
+        - asset: build/assets/fonts/bloggersans/Blogger-Sans-Bold Italic.otf
+          weight: 700
+          style: italic
+        - asset: build/assets/fonts/bloggersans/Blogger-Sans-Light.otf
+          weight: 300
+        - asset: build/assets/fonts/bloggersans/Blogger-Sans-Light Italic.otf
+          weight: 300
+          style: italic
+        - asset: build/assets/fonts/bloggersans/Blogger-Sans-Medium.otf
+          weight: 500
+        - asset: build/assets/fonts/bloggersans/Blogger-Sans-Medium Italic.otf
+          weight: 500
+          style: italic
