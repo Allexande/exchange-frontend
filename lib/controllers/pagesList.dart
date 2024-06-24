@@ -18,4 +18,5 @@ enum PageType {
   moderator_profile_page,
   reports_page,
   premoderation_page,
+  testLogin,
 }

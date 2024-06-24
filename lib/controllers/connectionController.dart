@@ -19,7 +19,7 @@ class ConnectionController {
     String token = (await TokenStorage.getToken()) ?? '';
 
     final headers = {
-      'Authorization': 'Bearer $token',
+      'Authorization': '$token',
     };
 
     print('Request URL: $url');
@@ -33,27 +33,28 @@ class ConnectionController {
     return response;
   }
 
-  static Future<http.Response> postRequest(String endpoint, Map<String, dynamic> body) async {
-    final client = await createHttpClient();
-    final url = Uri.parse('$baseUrl$endpoint');
-    String token = (await TokenStorage.getToken()) ?? '';
+static Future<http.Response> postRequest(String endpoint, Map<String, dynamic> body) async {
+  final client = await createHttpClient();
+  final url = Uri.parse('$baseUrl$endpoint');
+  String token = (await TokenStorage.getToken()) ?? '';
 
-    final headers = {
-      'Content-Type': 'application/json',
-      'Authorization': 'Bearer $token',
-    };
+  final headers = {
+    'Content-Type': 'application/json',
+    'Authorization': '$token',
+  };
 
-    print('Request URL: $url');
-    print('Request Headers: $headers');
-    print('Request Body: $body');
+  print('Request URL: $url');
+  print('Request Headers: $headers');
+  print('Request Body: $body');
 
-    final response = await client.post(url, headers: headers, body: json.encode(body));
+  final response = await client.post(url, headers: headers, body: json.encode(body));
 
-    print('Response status: ${response.statusCode}');
-    print('Response body: ${response.body}');
+  print('Response status: ${response.statusCode}');
+  print('Response body: ${response.body}');
 
-    return response;
-  }
+  return response;
+}
+
 
   static Future<http.Response> putRequest(String endpoint, Map<String, dynamic> body) async {
     final client = await createHttpClient();
@@ -62,7 +63,7 @@ class ConnectionController {
 
     final headers = {
       'Content-Type': 'application/json',
-      'Authorization': 'Bearer $token',
+      'Authorization': '$token',
     };
 
     print('Request URL: $url');
@@ -83,7 +84,7 @@ class ConnectionController {
     String token = (await TokenStorage.getToken()) ?? '';
 
     final headers = {
-      'Authorization': 'Bearer $token',
+      'Authorization': '$token',
     };
 
     print('Request URL: $url');

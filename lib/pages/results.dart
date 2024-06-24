@@ -1,7 +1,12 @@
+/*
+  Results page
+
+  Shows the houses avilable during a pireod of time
+*/
+
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'dart:math';
 import '../styles/theme.dart';
 import '../widgets/messageOverlay.dart';
 import '../controllers/pagesList.dart';
@@ -9,7 +14,7 @@ import '../models/house.dart';
 import '../controllers/connectionController.dart';
 
 class SearchResultsPage extends StatefulWidget {
-  final void Function(PageType, {String? city, DateTimeRange? dateRange, int? dealId}) onPageChange;
+  final void Function(PageType, {String? city, DateTimeRange? dateRange, int? houseId}) onPageChange;
   final String? selectedCity;
   final DateTimeRange? dateRange;
 
@@ -26,17 +31,22 @@ class SearchResultsPage extends StatefulWidget {
 
 class _SearchResultsPageState extends State<SearchResultsPage> {
   List<House> houses = [];
-  final Random random = Random();
 
   Future<void> loadDataWithFilters() async {
-    String endpoint;
-    if (widget.dateRange == null || widget.selectedCity == null) {
-      endpoint = '/houses';
-    } else {
+    String endpoint = '/houses/find';
+    Map<String, String> queryParams = {};
+
+    if (widget.selectedCity != null && widget.selectedCity!.isNotEmpty) {
+      queryParams['c'] = widget.selectedCity!;
+    }
+    if (widget.dateRange != null) {
       final DateFormat formatter = DateFormat('yyyy-MM-dd');
-      final String startDate = formatter.format(widget.dateRange!.start);
-      final String endDate = formatter.format(widget.dateRange!.end);
-      endpoint = '/houses/find?c=${widget.selectedCity}&startDate=$startDate&endDate=$endDate';
+      queryParams['startDate'] = formatter.format(widget.dateRange!.start);
+      queryParams['endDate'] = formatter.format(widget.dateRange!.end);
+    }
+
+    if (queryParams.isNotEmpty) {
+      endpoint += '?' + Uri(queryParameters: queryParams).query;
     }
 
     final response = await ConnectionController.getRequest(endpoint);
@@ -80,7 +90,7 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
               'Результаты поиска',
               style: TextStyles.subHeadline,
             ),
-            SizedBox(height: 8), 
+            SizedBox(height: 8),
             Expanded(
               child: ShaderMask(
                 shaderCallback: (Rect bounds) {
@@ -96,61 +106,89 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
                   itemCount: houses.length,
                   itemBuilder: (context, index) {
                     var item = houses[index];
-                    double randomRating = 4 + random.nextDouble(); 
-                    return Card(
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10.0),
-                      ),
-                      margin: EdgeInsets.symmetric(vertical: 8),
-                      color: AppColors.primary,
-                      child: ListTile(
-                        title: Text(
-                          item.city,
-                          style: TextStyle(
-                            fontFamily: 'BloggerSans',
-                            fontSize: 22, 
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.background,
-                          ),
+                    double rating = item.user.ratingSum / (item.user.totalReviews > 0 ? item.user.totalReviews : 1);
+                    String displayRating = rating == 0 ? '-' : rating.toStringAsFixed(1);
+                    return GestureDetector(
+                      onTap: () {
+                        widget.onPageChange(PageType.declaration_page, houseId: item.id);
+                      },
+                      child: Card(
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10.0),
                         ),
-                        subtitle: widget.dateRange != null
-                            ? Text(
-                                "${DateFormat('dd.MM.yyyy').format(widget.dateRange!.start)} - ${DateFormat('dd.MM.yyyy').format(widget.dateRange!.end)}",
+                        margin: EdgeInsets.symmetric(vertical: 8),
+                        color: AppColors.primary,
+                        child: Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                item.city,
+                                style: TextStyle(
+                                  fontFamily: 'BloggerSans',
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.background,
+                                ),
+                              ),
+                              if (widget.dateRange != null)
+                                Text(
+                                  "${DateFormat('dd.MM.yyyy').format(widget.dateRange!.start)} - ${DateFormat('dd.MM.yyyy').format(widget.dateRange!.end)}",
+                                  style: TextStyle(
+                                    fontFamily: 'BloggerSans',
+                                    fontSize: 16,
+                                    color: AppColors.background,
+                                  ),
+                                ),
+                              Text(
+                                item.address,
                                 style: TextStyle(
                                   fontFamily: 'BloggerSans',
                                   fontSize: 16,
                                   color: AppColors.background,
                                 ),
-                              )
-                            : null,
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.star,
-                              color: AppColors.secondary,
-                            ),
-                            SizedBox(width: 4),
-                            Text(
-                              randomRating.toStringAsFixed(1),
-                              style: TextStyle(
-                                fontFamily: 'BloggerSans',
-                                fontSize: 16,
-                                color: AppColors.background,
                               ),
-                            ),
-                          ],
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    item.description,
+                                    style: TextStyle(
+                                      fontFamily: 'BloggerSans',
+                                      fontSize: 16,
+                                      color: AppColors.background,
+                                    ),
+                                  ),
+                                  Row(
+                                    children: [
+                                      Icon(
+                                        Icons.star,
+                                        color: AppColors.secondary,
+                                      ),
+                                      SizedBox(width: 4),
+                                      Text(
+                                        displayRating,
+                                        style: TextStyle(
+                                          fontFamily: 'BloggerSans',
+                                          fontSize: 16,
+                                          color: AppColors.background,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
                         ),
-                        onTap: () {
-                          widget.onPageChange(PageType.deal_page, dealId: item.id);
-                        },
                       ),
                     );
                   },
                 ),
               ),
             ),
-            SizedBox(height: 8), 
+            SizedBox(height: 8),
             SizedBox(
               width: double.infinity,
               child: MainButton(

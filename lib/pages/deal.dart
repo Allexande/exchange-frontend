@@ -1,7 +1,6 @@
-import 'package:exchange/models/user.dart';
-import 'package:exchange/styles/buttons.dart';
 import 'package:flutter/material.dart';
 import 'dart:convert';
+import 'dart:typed_data';
 import '../styles/theme.dart';
 import '../widgets/messageOverlay.dart';
 import '../controllers/pagesList.dart';
@@ -9,30 +8,34 @@ import '../models/house.dart';
 import '../controllers/connectionController.dart';
 
 class DealPage extends StatefulWidget {
-  final void Function(PageType, {int? userId, int? dealId}) onPageChange;
-  final int? dealId;
+  final void Function(PageType, {int? userId, int? houseId, int? givenHouseId, int? recievedHouseId, int? reviewId}) onPageChange;
+  final int recievedHouseId;
+  final int givenHouseId;
+  final VoidCallback goBack;
 
-  DealPage({required this.onPageChange, this.dealId});
+  DealPage({required this.onPageChange, required this.recievedHouseId, required this.givenHouseId, required this.goBack});
 
   @override
   _DealPageState createState() => _DealPageState();
 }
 
 class _DealPageState extends State<DealPage> {
-  late String dateRange;
+  String? dateRange;
   House? firstHouse;
   House? secondHouse;
+  List<Uint8List> firstHouseImages = [];
+  List<Uint8List> secondHouseImages = [];
   int? userId;
+  String dealStatus = 'PENDING';
+  int? dealId;
+  bool hasReviewed = false;
+  Map<String, dynamic>? userReview;
 
   @override
   void initState() {
     super.initState();
     loadUserId();
-    if (widget.dealId != null) {
-      loadDealData(widget.dealId!);
-    }
-    // Инициализация mockup данных
-    mockupData();
+    loadDealData(widget.recievedHouseId, widget.givenHouseId);
   }
 
   Future<void> loadUserId() async {
@@ -44,65 +47,99 @@ class _DealPageState extends State<DealPage> {
         userId = data['id'];
       });
     } else {
-      MessageOverlayManager.showMessageOverlay("Ошибка", "Не удалось загрузить данные пользователя");
-    }
-  }
-
-  Future<void> loadDealData(int dealId) async {
-    final response = await ConnectionController.getRequest('/houses/trades');
-
-    if (response.statusCode == 200) {
-      final List<dynamic> responseData = json.decode(response.body);
-      final deal = responseData.firstWhere((deal) => deal['id'] == dealId, orElse: () => null);
-
-      if (deal != null) {
-        setState(() {
-          dateRange = '${deal['startDate']} - ${deal['endDate']}';
-          firstHouse = House.fromJson(deal['givenHouse']);
-          secondHouse = House.fromJson(deal['receivedHouse']);
-        });
-      } else {
-        MessageOverlayManager.showMessageOverlay("Сделка не найдена", "Понятно");
+      try {
+        final errorData = json.decode(response.body);
+        String errorMessage = 'Ошибка ${response.statusCode}: ${errorData['message'] ?? 'Неизвестная ошибка'}';
+        MessageOverlayManager.showMessageOverlay(errorMessage, "Понятно");
+      } catch (e) {
+        MessageOverlayManager.showMessageOverlay('Ошибка ${response.statusCode}: ${response.body}', "Понятно");
       }
-    } else {
-      final errorData = json.decode(response.body);
-      String errorMessage = 'Ошибка ${response.statusCode}: ${errorData['message'] ?? 'Неизвестная ошибка'}';
-      MessageOverlayManager.showMessageOverlay(errorMessage, "Понятно");
     }
   }
 
-  void mockupData() {
-    setState(() {
-      dateRange = '01.09.2024 - 10.09.2024';
-      firstHouse = House(
-        id: 1,
-        city: 'Москва',
-        address: 'ул. Ленина, д. 1',
-        description: 'Уютный дом в центре Москвы',
-        user: UserModel(
-          id: 1,
-          name: 'Иван',
-          surname: 'Иванов',
-          login: 'ivanov@example.com',
-          totalReviews: 10,
-          ratingSum: 50,
-        ),
-      );
-      secondHouse = House(
-        id: 2,
-        city: 'Санкт-Петербург',
-        address: 'ул. Невский пр., д. 10',
-        description: 'Прекрасная квартира в Санкт-Петербурге',
-        user: UserModel(
-          id: 2,
-          name: 'Петр',
-          surname: 'Петров',
-          login: 'petrov@example.com',
-          totalReviews: 5,
-          ratingSum: 25,
-        ),
-      );
-    });
+  Future<void> loadDealData(int recievedHouseId, int givenHouseId) async {
+    final houseResponse = await ConnectionController.getRequest('/houses/$recievedHouseId');
+    final givenHouseResponse = await ConnectionController.getRequest('/houses/$givenHouseId');
+    final dealResponse = await ConnectionController.getRequest('/houses/trades?givenHouseId=$givenHouseId&receivedHouseId=$recievedHouseId');
+
+    if (houseResponse.statusCode == 200 && givenHouseResponse.statusCode == 200 && dealResponse.statusCode == 200) {
+      setState(() {
+        firstHouse = House.fromJson(json.decode(utf8.decode(houseResponse.bodyBytes)));
+        secondHouse = House.fromJson(json.decode(utf8.decode(givenHouseResponse.bodyBytes)));
+        dateRange = "Дата сделки"; // Установите актуальную дату сделки
+        var deals = json.decode(utf8.decode(dealResponse.bodyBytes));
+        if (deals.isNotEmpty) {
+          var latestDeal = deals.last;
+          dealStatus = latestDeal['status'];
+          dealId = latestDeal['id'];
+        }
+        loadHouseImages(widget.recievedHouseId, widget.givenHouseId);
+        checkIfReviewed(widget.recievedHouseId);
+      });
+    } else {
+      try {
+        final errorData = json.decode(utf8.decode(houseResponse.bodyBytes));
+        String errorMessage = 'Ошибка ${houseResponse.statusCode}: ${errorData['message'] ?? 'Неизвестная ошибка'}';
+        MessageOverlayManager.showMessageOverlay(errorMessage, "Понятно");
+      } catch (e) {
+        MessageOverlayManager.showMessageOverlay('Ошибка ${houseResponse.statusCode}: ${utf8.decode(houseResponse.bodyBytes)}', "Понятно");
+      }
+    }
+  }
+
+  Future<void> loadHouseImages(int recievedHouseId, int givenHouseId) async {
+    final firstHouseImagesResponse = await ConnectionController.getRequest('/houses/$recievedHouseId/images');
+    final secondHouseImagesResponse = await ConnectionController.getRequest('/houses/$givenHouseId/images');
+
+    if (firstHouseImagesResponse.statusCode == 200) {
+      setState(() {
+        firstHouseImages = List<Uint8List>.from(json.decode(firstHouseImagesResponse.body).map((image) => base64Decode(image['path'])));
+      });
+    } else {
+      try {
+        final errorData = json.decode(firstHouseImagesResponse.body);
+        String errorMessage = 'Ошибка ${firstHouseImagesResponse.statusCode}: ${errorData['message'] ?? 'Неизвестная ошибка'}';
+        MessageOverlayManager.showMessageOverlay(errorMessage, "Понятно");
+      } catch (e) {
+        MessageOverlayManager.showMessageOverlay('Ошибка ${firstHouseImagesResponse.statusCode}: ${firstHouseImagesResponse.body}', "Понятно");
+      }
+    }
+
+    if (secondHouseImagesResponse.statusCode == 200) {
+      setState(() {
+        secondHouseImages = List<Uint8List>.from(json.decode(secondHouseImagesResponse.body).map((image) => base64Decode(image['path'])));
+      });
+    } else {
+      try {
+        final errorData = json.decode(secondHouseImagesResponse.body);
+        String errorMessage = 'Ошибка ${secondHouseImagesResponse.statusCode}: ${errorData['message'] ?? 'Неизвестная ошибка'}';
+        MessageOverlayManager.showMessageOverlay(errorMessage, "Понятно");
+      } catch (e) {
+        MessageOverlayManager.showMessageOverlay('Ошибка ${secondHouseImagesResponse.statusCode}: ${secondHouseImagesResponse.body}', "Понятно");
+      }
+    }
+  }
+
+  Future<void> checkIfReviewed(int houseId) async {
+    final reviewsResponse = await ConnectionController.getRequest('/houses/$houseId/reviews');
+
+    if (reviewsResponse.statusCode == 200) {
+      var reviews = json.decode(utf8.decode(reviewsResponse.bodyBytes));
+      setState(() {
+        userReview = reviews.firstWhere(
+            (review) => review['userDtoResponse']['id'] == userId,
+            orElse: () => null);
+        hasReviewed = userReview != null;
+      });
+    } else {
+      try {
+        final errorData = json.decode(utf8.decode(reviewsResponse.bodyBytes));
+        String errorMessage = 'Ошибка ${reviewsResponse.statusCode}: ${errorData['message'] ?? 'Неизвестная ошибка'}';
+        MessageOverlayManager.showMessageOverlay(errorMessage, "Понятно");
+      } catch (e) {
+        MessageOverlayManager.showMessageOverlay('Ошибка ${reviewsResponse.statusCode}: ${utf8.decode(reviewsResponse.bodyBytes)}', "Понятно");
+      }
+    }
   }
 
   Future<void> updateDealStatus(int dealId, String status) async {
@@ -117,9 +154,13 @@ class _DealPageState extends State<DealPage> {
       MessageOverlayManager.showMessageOverlay("Статус сделки обновлен", "Понятно");
       widget.onPageChange(PageType.deals_page);
     } else {
-      final errorData = json.decode(response.body);
-      String errorMessage = 'Ошибка ${response.statusCode}: ${errorData['message'] ?? 'Неизвестная ошибка'}';
-      MessageOverlayManager.showMessageOverlay(errorMessage, "Понятно");
+      try {
+        final errorData = json.decode(utf8.decode(response.bodyBytes));
+        String errorMessage = 'Ошибка ${response.statusCode}: ${errorData['message'] ?? 'Неизвестная ошибка'}';
+        MessageOverlayManager.showMessageOverlay(errorMessage, "Понятно");
+      } catch (e) {
+        MessageOverlayManager.showMessageOverlay('Ошибка ${response.statusCode}: ${utf8.decode(response.bodyBytes)}', "Понятно");
+      }
     }
   }
 
@@ -139,40 +180,98 @@ class _DealPageState extends State<DealPage> {
                       Padding(
                         padding: const EdgeInsets.all(8.0),
                         child: Text(
-                          'Сделка совершилась!',
+                          dealStatus == 'COMPLETED' ? 'Сделка совершилась!' : dealStatus == 'PENDING' ? 'Предложение на рассмотрении' : 'Сделка не состоялась',
                           style: TextStyles.subHeadline,
                           textAlign: TextAlign.center,
                         ),
                       ),
                       SizedBox(height: 10),
-                      _buildHouseSection(firstHouse!, 'Полученное жилье:'),
+                      _buildHouseSection(firstHouse!, 'Полученное жилье:', firstHouseImages),
                       SizedBox(height: 20),
-                      _buildHouseSection(secondHouse!, 'Ваше жилье:'),
+                      _buildHouseSection(secondHouse!, 'Ваше жилье:', secondHouseImages),
                       SizedBox(height: 20),
-                      if (userId != null && firstHouse!.user.id == userId)
+                      if (dealStatus == 'PENDING' && userId != null && firstHouse!.user.id == userId)
                         Column(
                           children: [
                             MainButton(
-                              onPressed: () => updateDealStatus(widget.dealId!, 'COMPLETED'),
+                              onPressed: () => updateDealStatus(dealId!, 'COMPLETED'),
                               text: 'Принять',
                             ),
                             SizedBox(height: 10),
                             MainButton(
-                              onPressed: () => updateDealStatus(widget.dealId!, 'REJECTED'),
+                              onPressed: () => updateDealStatus(dealId!, 'REJECTED'),
                               text: 'Отклонить',
                             ),
                           ],
+                        )
+                      else if (dealStatus == 'PENDING' && userId != null && firstHouse!.user.id != userId)
+                        MainButton(
+                          onPressed: () => updateDealStatus(dealId!, 'REJECTED'),
+                          text: 'Удалить сделку',
+                        )
+                      else if (dealStatus == 'COMPLETED')
+                        Column(
+                          children: [
+                            if (!hasReviewed)
+                              MainButton(
+                                onPressed: () {
+                                  widget.onPageChange(PageType.create_review_page, houseId: secondHouse!.id);
+                                },
+                                text: 'Оставить отзыв',
+                              )
+                            else
+                              Column(
+                                children: [
+                                  Padding(
+                                    padding: const EdgeInsets.all(8.0),
+                                    child: Text(
+                                      'Вы оставили отзыв на этот дом:',
+                                      style: TextStyles.mainText,
+                                      textAlign: TextAlign.center,
+                                    ),
+                                  ),
+                                  InkWell(
+                                    onTap: () {
+                                      widget.onPageChange(PageType.review_page, reviewId: userReview!['id']);
+                                    },
+                                    child: Card(
+                                      color: AppColors.secondary,
+                                      child: ListTile(
+                                        title: Text(
+                                          userReview!['description'],
+                                          style: TextStyles.mainText,
+                                        ),
+                                        trailing: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(Icons.star, color: Colors.amber),
+                                            SizedBox(width: 4),
+                                            Text(
+                                              userReview!['rating'].toString(),
+                                              style: TextStyles.mainText,
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                          ],
+                        )
+                      else if (dealStatus == 'REJECTED')
+                        Padding(
+                          padding: const EdgeInsets.all(8.0),
+                          child: Text(
+                            'Сделка не состоялась.',
+                            style: TextStyles.mainText,
+                            textAlign: TextAlign.center,
+                          ),
                         ),
                       SizedBox(height: 20),
-                      MainButton(
-                        onPressed: () {
-                          widget.onPageChange(PageType.deals_page);
-                        },
-                        text: 'Сделать предложение',
-                      ),
                       SubButton(
                         onPressed: () {
-                          widget.onPageChange(PageType.deals_page);
+                          widget.goBack();
                         },
                         text: 'Назад',
                       ),
@@ -184,7 +283,7 @@ class _DealPageState extends State<DealPage> {
     );
   }
 
-  Widget _buildHouseSection(House house, String title) {
+  Widget _buildHouseSection(House house, String title, List<Uint8List> houseImages) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
@@ -204,24 +303,30 @@ class _DealPageState extends State<DealPage> {
             textAlign: TextAlign.center,
           ),
         ),
-        Container(
-          height: 200,
-          color: Colors.grey, // Заглушка для изображения
-          child: Center(
+        houseImages.isEmpty
+            ? Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: Text(
+                  'Фото для данного дома отсутствуют',
+                  style: TextStyles.mainText,
+                  textAlign: TextAlign.center,
+                ),
+              )
+            : SizedBox(
+                height: 200,
+                child: PageView(
+                  children: houseImages.map((image) => Image.memory(image)).toList(),
+                ),
+              ),
+        if (dateRange != null)
+          Padding(
+            padding: const EdgeInsets.all(8.0),
             child: Text(
-              'Фото жилья',
-              style: TextStyles.subHeadline,
+              dateRange!,
+              style: TextStyles.mainText,
+              textAlign: TextAlign.center,
             ),
           ),
-        ),
-        Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: Text(
-            dateRange,
-            style: TextStyles.mainText,
-            textAlign: TextAlign.center,
-          ),
-        ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 8.0),
           child: Text(

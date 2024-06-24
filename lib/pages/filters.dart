@@ -16,9 +16,10 @@ import '../controllers/connectionController.dart';
 class FiltersPage extends StatefulWidget {
   final void Function(PageType, {String? city, DateTimeRange? dateRange}) onPageChange;
 
-  FiltersPage({required this.onPageChange});
+  const FiltersPage({super.key, required this.onPageChange});
 
   @override
+  // ignore: library_private_types_in_public_api
   _FiltersPageState createState() => _FiltersPageState();
 }
 
@@ -92,12 +93,9 @@ class _FiltersPageState extends State<FiltersPage> {
   }
 
   void _applyFiltersAndNavigate() {
-    if (selectedCity == null && dateRange == null) {
-      print('No search criteria provided');
-      MessageOverlayManager.showMessageOverlay(
-        "Вы не указали критерии поиска, поэтому увидите все существующие объявления",
-        "Понятно",
-      );
+    if (selectedCity == null || selectedCity!.isEmpty) {
+      MessageOverlayManager.showMessageOverlay("Необходимо указать город для поиска", "Понятно");
+      return;
     }
 
     widget.onPageChange(PageType.results_page, city: selectedCity, dateRange: dateRange);
@@ -130,7 +128,7 @@ class _FiltersPageState extends State<FiltersPage> {
                       controller: cityController,
                       keyboardType: TextInputType.text,
                       textInputAction: TextInputAction.done,
-                      padding: EdgeInsets.symmetric(vertical: 16),
+                      padding: const EdgeInsets.symmetric(vertical: 16),
                       onChanged: (query) {
                         _filterCities(query);
                         setState(() {});
@@ -138,8 +136,8 @@ class _FiltersPageState extends State<FiltersPage> {
                     ),
                     if (cityController.text.isNotEmpty && filteredCities.isNotEmpty)
                       Container(
-                        margin: EdgeInsets.only(top: 72), 
-                        constraints: BoxConstraints(maxHeight: 200),
+                        margin: const EdgeInsets.only(top: 72), 
+                        constraints: const BoxConstraints(maxHeight: 200),
                         decoration: BoxDecoration(
                           color: AppColors.background,
                           border: Border.all(color: AppColors.secondary),
@@ -181,7 +179,7 @@ class _FiltersPageState extends State<FiltersPage> {
                       controller: dateController,
                       keyboardType: TextInputType.text,
                       textInputAction: TextInputAction.done,
-                      padding: EdgeInsets.symmetric(vertical: 16),
+                      padding: const EdgeInsets.symmetric(vertical: 16),
                     ),
                   ),
                 ),

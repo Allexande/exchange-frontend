@@ -1,5 +1,13 @@
-import 'package:flutter/material.dart';
+/*
+  Redact page
+
+  Gives tools to upload new contacts and avatar image
+*/
+
 import 'dart:convert';
+import 'dart:io';
+import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import '../styles/theme.dart';
 import '../widgets/messageOverlay.dart';
 import '../controllers/pagesList.dart';
@@ -7,21 +15,25 @@ import '../controllers/connectionController.dart';
 
 class RedactProfilePage extends StatefulWidget {
   final void Function(PageType) onPageChange;
+  final VoidCallback goBack;
 
-  RedactProfilePage({required this.onPageChange});
+  const RedactProfilePage({super.key, required this.onPageChange, required this.goBack});
 
   @override
+  // ignore: library_private_types_in_public_api
   _RedactProfilePageState createState() => _RedactProfilePageState();
 }
 
 class _RedactProfilePageState extends State<RedactProfilePage> {
   final TextEditingController _infoController = TextEditingController();
-  final TextEditingController _socialsController = TextEditingController();
+  //final ImagePicker _picker = ImagePicker();
+  XFile? _selectedImage;
+  
+  get http => null;
 
   @override
   void dispose() {
     _infoController.dispose();
-    _socialsController.dispose();
     super.dispose();
   }
 
@@ -30,8 +42,6 @@ class _RedactProfilePageState extends State<RedactProfilePage> {
 
     final body = {
       'description': _infoController.text,
-      'socials': _socialsController.text,
-      
     };
 
     print('Request Endpoint: $endpoint');
@@ -61,6 +71,10 @@ class _RedactProfilePageState extends State<RedactProfilePage> {
     }
   }
 
+  Future<void> _pickImage() async {
+    MessageOverlayManager.showMessageOverlay("В данный момент загрузка фото невозможна", "Понятно");
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -71,45 +85,46 @@ class _RedactProfilePageState extends State<RedactProfilePage> {
           children: <Widget>[
             Text(
               "Редактирование профиля",
-              style: TextStyles.mainHeadline,
-              textAlign: TextAlign.center,
-            ),
-            Text(
-              "Имя и фамилия:",
               style: TextStyles.subHeadline,
               textAlign: TextAlign.center,
             ),
+            MainButton(
+              onPressed: _pickImage,
+              text: 'Загрузить аватар',
+            ),
+            if (_selectedImage != null)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 16.0),
+                child: Image.file(
+                  File(_selectedImage!.path),
+                  height: 200,
+                ),
+              ),
+            const SizedBox(height: 20),
+            Text(
+              "Контакты:",
+              style: TextStyles.subHeadline,
+              textAlign: TextAlign.left,
+            ),
             Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8.0),
+              padding: const EdgeInsets.symmetric(vertical: 0.0),
               child: DefaultTextField(
-                hintText: 'Имя и фамилия',
+                hintText: 'Описание',
                 controller: _infoController,
               ),
             ),
-            Text(
-              "Описание:",
-              style: TextStyles.subHeadline,
-              textAlign: TextAlign.center,
-            ),
             Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8.0),
-              child: DefaultTextField(
-                hintText: 'Описание',
-                controller: _socialsController,
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 16.0),
+              padding: const EdgeInsets.symmetric(vertical: 0.0),
               child: MainButton(
                 onPressed: _updateProfile,
                 text: 'Подтвердить',
               ),
             ),
             Padding(
-              padding: const EdgeInsets.symmetric(vertical: 16.0),
+              padding: const EdgeInsets.symmetric(vertical: 0.0),
               child: SubButton(
                 onPressed: () {
-                  widget.onPageChange(PageType.user_page);
+                  widget.goBack();
                 },
                 text: 'Назад',
               ),

@@ -9,8 +9,7 @@
   1) Don't invoke 'print' in production code.
      Try using a logging framework.dartavoid_print
 
-  2) Don't use 'BuildContext's across async gaps.
-     Try rewriting the code to not use the 'BuildContext', or guard the use with a 'mounted' check.dartuse_build_context_synchronously
+  2) Reduse warnings
 
 */
 

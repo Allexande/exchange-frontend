@@ -7,7 +7,7 @@ import '../controllers/connectionController.dart';
 import '../controllers/tokenStorage.dart';
 
 class NotificationsPage extends StatefulWidget {
-  final void Function(PageType, {int? dealId}) onPageChange;
+  final void Function(PageType, {int? houseId, int? givenHouseId, int? recievedHouseId}) onPageChange;
 
   NotificationsPage({required this.onPageChange});
 
@@ -34,14 +34,14 @@ class _NotificationsPageState extends State<NotificationsPage> {
     final userId = await loadUserId(token);
     if (userId == null) return;
 
-    final response = await ConnectionController.getRequest('/houses/trades');
+    final response = await ConnectionController.getRequest('/user/trades');
 
     if (response.statusCode == 200) {
       final List<dynamic> responseData = json.decode(utf8.decode(response.bodyBytes));
 
       setState(() {
         pendingDeals = responseData.where((deal) {
-          return deal['status'] == 'PENDING' && deal['givenHouse']['user']['id'] == userId;
+          return deal['status'] == 'PENDING' && deal['receivedHouse']['user']['id'] == userId;
         }).map((deal) => deal as Map<String, dynamic>).toList();
 
         if (pendingDeals.isEmpty) {
@@ -96,7 +96,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
                     var deal = deals[index];
                     return InkWell(
                       onTap: () {
-                        widget.onPageChange(PageType.deal_page, dealId: deal['id']);
+                        widget.onPageChange(PageType.deal_page, recievedHouseId: deal['receivedHouse']['id'], givenHouseId: deal['givenHouse']['id']);
                       },
                       child: Card(
                         color: AppColors.primary,

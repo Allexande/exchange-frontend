@@ -6,6 +6,7 @@
 
 import 'package:flutter/material.dart';
 //import 'package:flutter_svg/flutter_svg.dart';
+import 'package:flutter_svg/svg.dart';
 import 'dart:convert';
 import '../styles/theme.dart';
 import '../controllers/pagesList.dart';
@@ -14,24 +15,28 @@ import '../controllers/connectionController.dart';
 
 class RegistrationPage extends StatefulWidget {
   final void Function(PageType) onPageChange;
+  final VoidCallback goBack;
 
-  const RegistrationPage({super.key, required this.onPageChange});
+  const RegistrationPage({super.key, required this.onPageChange, required this.goBack});
 
   @override
+  // ignore: library_private_types_in_public_api
   _RegistrationPageState createState() => _RegistrationPageState();
 }
 
 class _RegistrationPageState extends State<RegistrationPage> {
   final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _surnameController = TextEditingController();
   final TextEditingController _contactsController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
 
-  Future<int> registerUser(String name, String contacts, String email, String password) async {
+  Future<int> registerUser(String name, String surname, String contacts, String email, String password) async {
     const endpoint = '/register';
     final body = {
       'name': name,
-      'surname': contacts,
+      'surname': surname,
+      'description': contacts,
       'email': email,
       'login': email,
       'password': password,
@@ -61,12 +66,18 @@ class _RegistrationPageState extends State<RegistrationPage> {
 
   void register() async {
     String name = _nameController.text;
+    String surname = _surnameController.text;
     String contacts = _contactsController.text;
     String email = _emailController.text;
     String password = _passwordController.text;
 
     if (name.isEmpty) {
       MessageOverlayManager.showMessageOverlay("Введите ваше имя.", "Понятно");
+      return;
+    }
+
+    if (surname.isEmpty) {
+      MessageOverlayManager.showMessageOverlay("Введите вашу фамилию.", "Понятно");
       return;
     }
 
@@ -85,12 +96,11 @@ class _RegistrationPageState extends State<RegistrationPage> {
       return;
     }
 
-    int result = await registerUser(name, contacts, email, password);
+    int result = await registerUser(name, surname, contacts, email, password);
 
     if (result == 1) {
       widget.onPageChange(PageType.confirm_page);
     } else {
-      // Ошибка регистрации
       MessageOverlayManager.showMessageOverlay("Ошибка регистрации. Попробуйте снова.", "Понятно");
     }
   }
@@ -120,12 +130,10 @@ class _RegistrationPageState extends State<RegistrationPage> {
             mainAxisAlignment: MainAxisAlignment.start,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
-              /*
               SvgPicture.asset(
                 'build/assets/images/logo.svg',
                 height: 100,
               ),
-              */
               Text(
                 'Регистрация',
                 style: TextStyles.subHeadline,
@@ -134,6 +142,11 @@ class _RegistrationPageState extends State<RegistrationPage> {
               DefaultTextField(
                 hintText: 'Ваше имя',
                 controller: _nameController,
+                keyboardType: TextInputType.text,
+              ),
+              DefaultTextField(
+                hintText: 'Ваша фамилия',
+                controller: _surnameController,
                 keyboardType: TextInputType.text,
               ),
               DefaultTextField(
@@ -146,11 +159,10 @@ class _RegistrationPageState extends State<RegistrationPage> {
                 controller: _emailController,
                 keyboardType: TextInputType.emailAddress,
               ),
-              DefaultTextField(
+              PasswordTextField(
                 hintText: 'Пароль',
                 controller: _passwordController,
                 keyboardType: TextInputType.text,
-                //obscureText: true,
               ),
               MainButton(
                 text: 'Регистрация',
@@ -159,7 +171,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
               SubButton(
                 text: 'Назад',
                 onPressed: () {
-                  widget.onPageChange(PageType.authorization_page); 
+                  widget.goBack();
                 },
               ),
             ],

@@ -6,7 +6,7 @@ import '../controllers/pagesList.dart';
 import '../controllers/connectionController.dart';
 
 class ActiveDealsPage extends StatefulWidget {
-  final void Function(PageType) onPageChange;
+  final void Function(PageType, {int? houseId, int? givenHouseId, int? recievedHouseId}) onPageChange;
 
   ActiveDealsPage({required this.onPageChange});
 
@@ -46,7 +46,7 @@ class _ActiveDealsPageState extends State<ActiveDealsPage> {
       return;
     }
 
-    final response = await ConnectionController.getRequest('/houses/trades');
+    final response = await ConnectionController.getRequest('/user/trades');
 
     if (response.statusCode == 200) {
       final List<dynamic> responseData = json.decode(utf8.decode(response.bodyBytes));
@@ -54,7 +54,7 @@ class _ActiveDealsPageState extends State<ActiveDealsPage> {
       if (mounted) {
         setState(() {
           myDealsData = responseData.where((deal) {
-            return deal['status'] != 'COMPLETED' && deal['givenHouse']['user']['id'] == userId;
+            return deal['status'] == 'PENDING' && deal['givenHouse']['user']['id'] == userId;
           }).map((deal) => deal as Map<String, dynamic>).toList();
 
           completedDealsData = responseData.where((deal) {
@@ -103,8 +103,7 @@ class _ActiveDealsPageState extends State<ActiveDealsPage> {
                     var deal = deals[index];
                     return InkWell(
                       onTap: () {
-                        print("Tapped on deal: ${deal["dealTitle"]}");
-                        widget.onPageChange(PageType.declaration_page);
+                        widget.onPageChange(PageType.deal_page, recievedHouseId: deal['receivedHouse']['id'], givenHouseId: deal['givenHouse']['id']);
                       },
                       child: Card(
                         color: AppColors.secondary,
@@ -114,14 +113,14 @@ class _ActiveDealsPageState extends State<ActiveDealsPage> {
                         margin: EdgeInsets.symmetric(vertical: 8, horizontal: 16),
                         child: ListTile(
                           title: Text(
-                            deal["dealTitle"],
+                            deal["givenHouse"]["city"],
                             style: TextStyles.subHeadline.copyWith(color: AppColors.background),
                           ),
                           subtitle: Text(
-                            deal["dealDateRange"],
+                            deal["startDate"],
                             style: TextStyles.mainText.copyWith(color: AppColors.background),
                           ),
-                          trailing: Icon(deal["dealIcon"], color: AppColors.background),
+                          trailing: Icon(Icons.swap_horiz, color: AppColors.background),
                         ),
                       ),
                     );
