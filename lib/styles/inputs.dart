@@ -1,7 +1,3 @@
-/*
-  All types of input fields
-*/
-
 import 'package:flutter/material.dart';
 import 'colors.dart';
 import 'texts.dart';
@@ -73,6 +69,52 @@ class DefaultTextField extends StatelessWidget {
       padding: padding,
       child: TextField(
         controller: controller,
+        keyboardType: keyboardType,
+        textInputAction: textInputAction,
+        onSubmitted: onSubmitted,
+        onChanged: onChanged ?? (_) {}, 
+        style: TextStyles.mainText, 
+        decoration: InputStyles.defaultInputDecoration(
+          hintText: hintText,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          borderRadius: BorderRadius.circular(8),
+          borderWidth: 2,
+          borderColor: AppColors.primary,
+          fillColor: AppColors.background,
+          hintStyle: TextStyles.mainText,
+        ),
+      ),
+    );
+  }
+}
+
+class PasswordTextField extends StatelessWidget {
+  final String hintText;
+  final TextEditingController controller;
+  final TextInputType keyboardType;
+  final TextInputAction textInputAction;
+  final void Function(String)? onSubmitted;
+  final EdgeInsetsGeometry padding;
+  final void Function(String)? onChanged;
+
+  const PasswordTextField({
+    super.key,
+    required this.hintText,
+    required this.controller,
+    this.keyboardType = TextInputType.text,
+    this.textInputAction = TextInputAction.done,
+    this.onSubmitted,
+    this.padding = const EdgeInsets.symmetric(vertical: 8),
+    this.onChanged, 
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: padding,
+      child: TextField(
+        controller: controller,
+        obscureText: true,
         keyboardType: keyboardType,
         textInputAction: textInputAction,
         onSubmitted: onSubmitted,

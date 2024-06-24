@@ -1,4 +1,5 @@
 import 'package:exchange/controllers/pagesList.dart';
+import 'package:exchange/models/house.dart';
 import 'package:flutter/material.dart';
 import 'dart:convert';
 import '../styles/theme.dart';
@@ -7,9 +8,10 @@ import '../controllers/connectionController.dart';
 
 class CreateReviewPage extends StatefulWidget {
   final int? houseId;
-  final void Function(PageType) onPageChange;
+  final void Function(PageType, {int? houseId}) onPageChange;
+  final VoidCallback goBack;
 
-  CreateReviewPage({this.houseId, required this.onPageChange});
+  CreateReviewPage({this.houseId, required this.onPageChange, required this.goBack});
 
   @override
   _CreateReviewPageState createState() => _CreateReviewPageState();
@@ -17,7 +19,8 @@ class CreateReviewPage extends StatefulWidget {
 
 class _CreateReviewPageState extends State<CreateReviewPage> {
   final TextEditingController _reviewController = TextEditingController();
-  int _selectedRating = 1; // Default rating
+  int _selectedRating = 5;
+  House? house;
 
   @override
   void initState() {
@@ -27,6 +30,25 @@ class _CreateReviewPageState extends State<CreateReviewPage> {
         MessageOverlayManager.showMessageOverlay(
             "Ошибка", "нужно выбрать дом на который вы оставляете отзыв");
       });
+    } else {
+      loadHouseData(widget.houseId!);
+    }
+  }
+
+  Future<void> loadHouseData(int houseId) async {
+    final response = await ConnectionController.getRequest('/houses/$houseId');
+    if (response.statusCode == 200) {
+      setState(() {
+        house = House.fromJson(json.decode(utf8.decode(response.bodyBytes)));
+      });
+    } else {
+      try {
+        final errorData = json.decode(utf8.decode(response.bodyBytes));
+        String errorMessage = 'Ошибка ${response.statusCode}: ${errorData['message'] ?? 'Неизвестная ошибка'}';
+        MessageOverlayManager.showMessageOverlay(errorMessage, "Понятно");
+      } catch (e) {
+        MessageOverlayManager.showMessageOverlay('Ошибка ${response.statusCode}: ${response.body}', "Понятно");
+      }
     }
   }
 
@@ -46,11 +68,11 @@ class _CreateReviewPageState extends State<CreateReviewPage> {
 
     if (response.statusCode == 200) {
       MessageOverlayManager.showMessageOverlay(
-          "Успех", "Отзыв успешно опубликован");
-      Navigator.of(context).pop();
+          "Отзыв успешно опубликован", "Понятно");
+      widget.goBack();
     } else {
       try {
-        final errorData = json.decode(response.body);
+        final errorData = json.decode(utf8.decode(response.bodyBytes));
         String errorMessage =
             'Ошибка ${response.statusCode}: ${errorData['message'] ?? 'Неизвестная ошибка'}';
         MessageOverlayManager.showMessageOverlay(errorMessage, "Понятно");
@@ -63,13 +85,6 @@ class _CreateReviewPageState extends State<CreateReviewPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text('Написать отзыв'),
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-      ),
       body: SingleChildScrollView(
         child: Padding(
           padding: EdgeInsets.all(16.0),
@@ -77,12 +92,31 @@ class _CreateReviewPageState extends State<CreateReviewPage> {
             mainAxisAlignment: MainAxisAlignment.start,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
-              Text(
-                'Написать отзыв',
-                style: TextStyles.mainHeadline,
-                textAlign: TextAlign.center,
-              ),
-              SizedBox(height: 20),
+              if (house != null) ...[
+                Text(
+                  'Оставить отзыв о доме',
+                  style: TextStyles.mainHeadline,
+                  textAlign: TextAlign.center,
+                ),
+                SizedBox(height: 10),
+                Text(
+                  'Город: ${house!.city}',
+                  style: TextStyles.mainText,
+                ),
+                Text(
+                  'Адрес: ${house!.address}',
+                  style: TextStyles.mainText,
+                ),
+                Text(
+                  'Владелец: ${house!.user.name} ${house!.user.surname}',
+                  style: TextStyles.mainText,
+                ),
+                Text(
+                  'Рейтинг владельца: ${house!.user.ratingSum}',
+                  style: TextStyles.mainText,
+                ),
+                SizedBox(height: 20),
+              ],
               DefaultTextField(
                 hintText: 'Введите ваш отзыв здесь',
                 controller: _reviewController,
@@ -119,9 +153,7 @@ class _CreateReviewPageState extends State<CreateReviewPage> {
               SizedBox(height: 10),
               SubButton(
                 text: 'Назад',
-                onPressed: () {
-                  Navigator.of(context).pop();
-                },
+                onPressed: widget.goBack,
               ),
             ],
           ),

@@ -12,10 +12,12 @@ import '../controllers/pagesList.dart';
 
 class ConfirmPage extends StatefulWidget {
   final void Function(PageType) onPageChange;
+  final VoidCallback goBack;
 
-  const ConfirmPage({required this.onPageChange});
+  const ConfirmPage({super.key, required this.onPageChange, required this.goBack});
 
   @override
+  // ignore: library_private_types_in_public_api
   _ConfirmPageState createState() => _ConfirmPageState();
 }
 
@@ -47,7 +49,7 @@ class _ConfirmPageState extends State<ConfirmPage> {
               SubButton(
                 text: 'Назад',
                 onPressed: () {
-                  widget.onPageChange(PageType.authorization_page);
+                  widget.goBack();
                 },
               ),
             ],

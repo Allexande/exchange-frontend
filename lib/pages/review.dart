@@ -8,9 +8,10 @@ import '../controllers/connectionController.dart';
 
 class ReviewPage extends StatefulWidget {
   final void Function(PageType, {int? reviewId}) onPageChange;
+  final VoidCallback goBack;
   final int reviewId;
 
-  ReviewPage({required this.onPageChange, required this.reviewId});
+  ReviewPage({required this.onPageChange, required this.reviewId, required this.goBack});
 
   @override
   _ReviewPageState createState() => _ReviewPageState();
@@ -41,20 +42,13 @@ class _ReviewPageState extends State<ReviewPage> {
 
   void _onItemTapped(int index) {
     setState(() {
-      // Handle bottom navigation item taps if needed
+      
     });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text('Отзыв'),
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-      ),
       body: SingleChildScrollView(
         child: Padding(
           padding: EdgeInsets.all(16.0),
@@ -129,7 +123,7 @@ class _ReviewPageState extends State<ReviewPage> {
               MainButton(
                 text: 'Назад',
                 onPressed: () {
-                  Navigator.of(context).pop();
+                  widget.goBack();
                 },
               ),
             ],

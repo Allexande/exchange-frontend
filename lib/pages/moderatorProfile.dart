@@ -25,7 +25,6 @@ class _ModerProfilePageState extends State<ModerProfilePage> {
 
   Future<void> loadProfileData() async {
     final endpoint = '/user/me';
-
     final response = await ConnectionController.getRequest(endpoint);
 
     if (response.statusCode == 200) {
@@ -45,14 +44,8 @@ class _ModerProfilePageState extends State<ModerProfilePage> {
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            Text(
-              'Модератор',
-              textAlign: TextAlign.center,
-              style: TextStyles.mainHeadline,
-            ),
-            SizedBox(height: 20),
             Text(
               'Вы находитесь в аккаунте модератора',
               textAlign: TextAlign.center,
@@ -61,29 +54,26 @@ class _ModerProfilePageState extends State<ModerProfilePage> {
             SizedBox(height: 20),
             profileData != null
                 ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Почта: ${profileData!['login']}',
-                        textAlign: TextAlign.center,
+                        'Имя: ${profileData!['name']}',
                         style: TextStyles.mainText,
                       ),
-                      SizedBox(height: 20),
+                      SizedBox(height: 10),
                       Text(
                         'Фамилия: ${profileData!['surname']}',
-                        textAlign: TextAlign.center,
                         style: TextStyles.mainText,
                       ),
-                      SizedBox(height: 20),
+                      SizedBox(height: 10),
                       Text(
-                        'Имя: ${profileData!['name']}',
-                        textAlign: TextAlign.center,
+                        'Почта: ${profileData!['login']}',
                         style: TextStyles.mainText,
                       ),
                     ],
                   )
                 : CircularProgressIndicator(),
-            SizedBox(height: 20),
-            MainButton(
+            SubButton(
               onPressed: () {
                 widget.onPageChange(PageType.authorization_page);
               },
@@ -91,6 +81,7 @@ class _ModerProfilePageState extends State<ModerProfilePage> {
             ),
           ],
         ),
+        
       ),
     );
   }

@@ -5,6 +5,7 @@ class UserModel {
   final String name;
   final int totalReviews;
   final int ratingSum;
+  final String? description;
 
   UserModel({
     required this.id,
@@ -13,6 +14,7 @@ class UserModel {
     required this.name,
     required this.totalReviews,
     required this.ratingSum,
+    this.description,
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
@@ -23,6 +25,7 @@ class UserModel {
       name: json['name'],
       totalReviews: json['totalReviews'],
       ratingSum: json['ratingSum'],
+      description: json['description'] ?? '',
     );
   }
 
@@ -34,6 +37,7 @@ class UserModel {
       'name': name,
       'totalReviews': totalReviews,
       'ratingSum': ratingSum,
+      'description': description,
     };
   }
 }

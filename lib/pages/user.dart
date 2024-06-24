@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import '../styles/theme.dart';
 import '../models/user.dart' as user_model;
@@ -7,7 +8,7 @@ import '../controllers/pagesList.dart';
 import '../controllers/connectionController.dart';
 
 class UserProfilePage extends StatefulWidget {
-  final void Function(PageType, {int? userId}) onPageChange;
+  final void Function(PageType, {int? userId, int? reviewId, int? houseId}) onPageChange;
   final int? userId;
 
   UserProfilePage({Key? key, required this.onPageChange, this.userId}) : super(key: key);
@@ -20,6 +21,9 @@ class _UserProfilePageState extends State<UserProfilePage> {
   bool isOwner = false;
   user_model.UserModel? user;
   bool isLoading = true;
+  Uint8List? avatarImage;
+  List<Map<String, dynamic>> userReviews = [];
+  List<Map<String, dynamic>> userHouses = [];
 
   @override
   void initState() {
@@ -33,10 +37,10 @@ class _UserProfilePageState extends State<UserProfilePage> {
     final response = await ConnectionController.getRequest(endpoint);
 
     print('Response status: ${response.statusCode}');
-    print('Response body: ${response.body}');
+    print('Response body: ${utf8.decode(response.bodyBytes)}');
 
     if (response.statusCode == 200) {
-      final data = json.decode(response.body);
+      final data = json.decode(utf8.decode(response.bodyBytes));
       print('Parsed data: $data');
       if (data['id'] == 0 || data['login'] == null) {
         print('Invalid user data: $data');
@@ -55,8 +59,9 @@ class _UserProfilePageState extends State<UserProfilePage> {
           isOwner = widget.userId == null;
           isLoading = false;
         });
-        print("IS OWNER???");
-        print(isOwner);
+        loadAvatar();
+        loadUserReviews();
+        loadUserHouses();
       }
     } else {
       if (mounted) {
@@ -69,6 +74,152 @@ class _UserProfilePageState extends State<UserProfilePage> {
           : "Пользователя с ID=${widget.userId} не существует";
       MessageOverlayManager.showMessageOverlay(errorMessage, "Понятно");
     }
+  }
+
+  Future<void> loadAvatar() async {
+    final endpoint = '/users/${user!.id}/avatar';
+    final response = await ConnectionController.getRequest(endpoint);
+
+    if (response.statusCode == 200) {
+      setState(() {
+        avatarImage = base64Decode(response.body);
+      });
+    }
+  }
+
+  Future<void> loadUserReviews() async {
+    final endpoint = '/users/${user!.id}/reviews';
+    final response = await ConnectionController.getRequest(endpoint);
+
+    if (response.statusCode == 200) {
+      setState(() {
+        userReviews = List<Map<String, dynamic>>.from(json.decode(utf8.decode(response.bodyBytes)));
+      });
+    }
+  }
+
+  Future<void> loadUserHouses() async {
+    final endpoint = '/users/${user!.id}/houses';
+    final response = await ConnectionController.getRequest(endpoint);
+
+    if (response.statusCode == 200) {
+      setState(() {
+        userHouses = List<Map<String, dynamic>>.from(json.decode(utf8.decode(response.bodyBytes)));
+      });
+    }
+  }
+
+  Widget _buildUserAvatar() {
+    if (avatarImage != null) {
+      return CircleAvatar(
+        radius: 60,
+        backgroundImage: MemoryImage(avatarImage!),
+      );
+    } else {
+      return Column(
+        children: [
+          Icon(Icons.account_circle, size: 120),
+          Text("Аватар не загружен", style: TextStyles.subText),
+        ],
+      );
+    }
+  }
+
+  Widget _buildReviewsSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Отзывы:', style: TextStyles.subHeadline),
+        userReviews.isEmpty
+            ? Text('Отсутствуют', textAlign: TextAlign.center, style: TextStyles.mainText)
+            : Column(
+                children: userReviews.map((review) {
+                  return GestureDetector(
+                    onTap: () {
+                      widget.onPageChange(PageType.review_page, reviewId: review['id']);
+                    },
+                    child: Card(
+                      margin: EdgeInsets.symmetric(vertical: 10),
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Рейтинг: ${review['rating']}',
+                                    style: TextStyles.smallHeadline,
+                                  ),
+                                  SizedBox(height: 5),
+                                  Text(
+                                    review['description'] ?? '',
+                                    style: TextStyles.mainText,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+      ],
+    );
+  }
+
+  Widget _buildHousesSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Публикации:', style: TextStyles.subHeadline),
+        userHouses.isEmpty
+            ? Text('Отсутствуют', textAlign: TextAlign.center, style: TextStyles.mainText)
+            : Column(
+                children: userHouses.map((house) {
+                  return GestureDetector(
+                    onTap: () {
+                      widget.onPageChange(PageType.declaration_page, houseId: house['id']);
+                    },
+                    child: Card(
+                      margin: EdgeInsets.symmetric(vertical: 10),
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    '${house['city']}, ${house['address']}',
+                                    style: TextStyles.smallHeadline,
+                                  ),
+                                  SizedBox(height: 5),
+                                  Text(
+                                    house['description'] ?? '',
+                                    style: TextStyles.mainText,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+      ],
+    );
+  }
+
+  void _logout() {
+    // TODO Clear token
+    widget.onPageChange(PageType.login_page);
   }
 
   @override
@@ -86,26 +237,35 @@ class _UserProfilePageState extends State<UserProfilePage> {
                         mainAxisAlignment: MainAxisAlignment.center,
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: <Widget>[
-                          Icon(Icons.account_circle, size: 120),
+                          _buildUserAvatar(),
+                          SizedBox(height: 20),
                           Text(
                             '${user!.name} ${user!.surname}',
                             style: TextStyles.mainHeadline,
                             textAlign: TextAlign.center,
                           ),
-                          Text('Имя:', style: TextStyles.subHeadline),
-                          Text(user!.name, textAlign: TextAlign.center, style: TextStyles.mainText),
-                          Text('Соцсети:', style: TextStyles.subHeadline),
-                          Text(user!.surname, textAlign: TextAlign.center, style: TextStyles.mainText),
-                          Text('Публикации:', style: TextStyles.subHeadline),
-                          Text('Отсутствуют', textAlign: TextAlign.center, style: TextStyles.mainText),
-                          Text('Комментарии:', style: TextStyles.subHeadline),
-                          Text('Отсутствуют', textAlign: TextAlign.center, style: TextStyles.mainText),
+                          SizedBox(height: 20),
+                          Text('Контакты:', style: TextStyles.subHeadline),
+                          Text(user!.description ?? '', textAlign: TextAlign.left, style: TextStyles.mainText),
+                          SizedBox(height: 20),
+                          _buildReviewsSection(),
+                          SizedBox(height: 20),
+                          _buildHousesSection(),
+                          SizedBox(height: 20),
                           if (isOwner)
-                            MainButton(
-                              text: 'Редактировать',
-                              onPressed: () {
-                                widget.onPageChange(PageType.redact_page);
-                              },
+                            Column(
+                              children: [
+                                MainButton(
+                                  text: 'Редактировать',
+                                  onPressed: () {
+                                    widget.onPageChange(PageType.redact_page);
+                                  },
+                                ),
+                                MainButton(
+                                  text: 'Выйти',
+                                  onPressed: _logout,
+                                ),
+                              ],
                             )
                           else
                             MainButton(

@@ -10,8 +10,9 @@ import '../controllers/connectionController.dart';
 
 class CreateDeclarationPage extends StatefulWidget {
   final void Function(PageType) onPageChange;
+  final VoidCallback goBack;
 
-  CreateDeclarationPage({required this.onPageChange});
+  CreateDeclarationPage({required this.onPageChange, required this.goBack});
 
   @override
   _CreateDeclarationPageState createState() => _CreateDeclarationPageState();
@@ -20,7 +21,8 @@ class CreateDeclarationPage extends StatefulWidget {
 class _CreateDeclarationPageState extends State<CreateDeclarationPage> {
   final TextEditingController _dateController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
-  final TextEditingController cityController = TextEditingController();
+  final TextEditingController _cityController = TextEditingController();
+  final TextEditingController _addressController = TextEditingController();
   DateTimeRange? dateRange;
   String? selectedCity;
   List<String> availableCities = [];
@@ -89,51 +91,49 @@ class _CreateDeclarationPageState extends State<CreateDeclarationPage> {
   }
 
   Future<void> _submitDeclaration() async {
-  if (_descriptionController.text.isEmpty) {
-    MessageOverlayManager.showMessageOverlay("Описание не может быть пустым", "Понятно");
-    return;
-  }
+    if (_descriptionController.text.isEmpty) {
+      MessageOverlayManager.showMessageOverlay("Описание не может быть пустым", "Понятно");
+      return;
+    }
 
-  if (selectedCity == null) {
-    MessageOverlayManager.showMessageOverlay("Вы не выбрали город", "Понятно");
-    return;
-  }
+    if (selectedCity == null) {
+      MessageOverlayManager.showMessageOverlay("Вы не выбрали город", "Понятно");
+      return;
+    }
 
-  if (dateRange == null) {
-    MessageOverlayManager.showMessageOverlay("Вы не выбрали даты", "Понятно");
-    return;
-  }
+    if (_addressController.text.isEmpty) {
+      MessageOverlayManager.showMessageOverlay("Адрес не может быть пустым", "Понятно");
+      return;
+    }
 
-  const endpoint = '/houses';
+    const endpoint = '/houses';
 
-  final body = {
-    'description': _descriptionController.text,
-    'city': selectedCity ?? 'Unknown',
-    'address': 'Sample Address',
-    'startDate': dateRange!.start.toIso8601String(),
-    'endDate': dateRange!.end.toIso8601String(),
-  };
+    final body = {
+      'description': _descriptionController.text,
+      'city': selectedCity ?? 'Unknown',
+      'address': _addressController.text,
+    };
 
-  print('Request Endpoint: $endpoint');
-  print('Request Body: $body');
+    print('Request Endpoint: $endpoint');
+    print('Request Body: $body');
 
-  final response = await ConnectionController.postRequest(endpoint, body);
+    final response = await ConnectionController.postRequest(endpoint, body);
 
-  print('Response status: ${response.statusCode}');
-  print('Response body: ${response.body}');
+    print('Response status: ${response.statusCode}');
+    print('Response body: ${response.body}');
 
-  if (response.statusCode == 200) {
-    widget.onPageChange(PageType.results_page);
-  } else {
-    try {
-      final errorData = json.decode(response.body);
-      String errorMessage = 'Ошибка ${response.statusCode}: ${errorData['message'] ?? 'Неизвестная ошибка'}';
-      MessageOverlayManager.showMessageOverlay(errorMessage, "Понятно");
-    } catch (e) {
-      MessageOverlayManager.showMessageOverlay('Ошибка ${response.statusCode}: ${response.body}', "Понятно");
+    if (response.statusCode == 200) {
+      widget.onPageChange(PageType.results_page);
+    } else {
+      try {
+        final errorData = json.decode(response.body);
+        String errorMessage = 'Ошибка ${response.statusCode}: ${errorData['message'] ?? 'Неизвестная ошибка'}';
+        MessageOverlayManager.showMessageOverlay(errorMessage, "Понятно");
+      } catch (e) {
+        MessageOverlayManager.showMessageOverlay('Ошибка ${response.statusCode}: ${response.body}', "Понятно");
+      }
     }
   }
-}
 
   @override
   Widget build(BuildContext context) {
@@ -153,23 +153,11 @@ class _CreateDeclarationPageState extends State<CreateDeclarationPage> {
               text: 'Загрузить фото',
             ),
             SizedBox(height: 10),
-            /*
-            GestureDetector(
-              onTap: () => _selectDateRange(context),
-              child: AbsorbPointer(
-                child: DefaultTextField(
-                  hintText: 'Дата',
-                  keyboardType: TextInputType.datetime,
-                  controller: _dateController,
-                ),
-              ),
-            ),
-            */
             Stack(
               children: [
                 DefaultTextField(
                   hintText: 'Выбрать город',
-                  controller: cityController,
+                  controller: _cityController,
                   keyboardType: TextInputType.text,
                   textInputAction: TextInputAction.done,
                   onChanged: (query) {
@@ -177,7 +165,7 @@ class _CreateDeclarationPageState extends State<CreateDeclarationPage> {
                     setState(() {});
                   },
                 ),
-                if (cityController.text.isNotEmpty && filteredCities.isNotEmpty)
+                if (_cityController.text.isNotEmpty && filteredCities.isNotEmpty)
                   Container(
                     margin: EdgeInsets.only(top: 72),
                     constraints: BoxConstraints(maxHeight: 200),
@@ -199,7 +187,7 @@ class _CreateDeclarationPageState extends State<CreateDeclarationPage> {
                           onTap: () {
                             setState(() {
                               selectedCity = filteredCities[index];
-                              cityController.text = filteredCities[index];
+                              _cityController.text = filteredCities[index];
                               filteredCities.clear();
                             });
                           },
@@ -208,6 +196,10 @@ class _CreateDeclarationPageState extends State<CreateDeclarationPage> {
                     ),
                   ),
               ],
+            ),
+            DefaultTextField(
+              hintText: 'Адрес',
+              controller: _addressController,
             ),
             DefaultTextField(
               hintText: 'Описание',
@@ -219,7 +211,7 @@ class _CreateDeclarationPageState extends State<CreateDeclarationPage> {
             ),
             SubButton(
               onPressed: () {
-                widget.onPageChange(PageType.filters_page);
+                widget.goBack();
               },
               text: 'Назад',
             ),

@@ -15,20 +15,31 @@ import '../controllers/connectionController.dart';
 
 class LoginPage extends StatefulWidget {
   final void Function(PageType) onPageChange;
+  final VoidCallback goBack;
 
-  const LoginPage({super.key, required this.onPageChange});
+  const LoginPage({super.key, required this.onPageChange, required this.goBack});
 
   @override
   _LoginPageState createState() => _LoginPageState();
 }
 
 class _LoginPageState extends State<LoginPage> {
-  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _loginController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
 
-  Future<int> authenticateUser(String email, String password) async {
-    final endpoint = '/login';
-    final body = {'login': email, 'password': password};
+  bool isValidEmail(String email) {
+    final emailRegex = RegExp(r'^[^@]+@[^@]+\.[^@]+');
+    return emailRegex.hasMatch(email);
+  }
+
+  Future<int> authenticateUser(String login, String password) async {
+    const endpoint = '/login';
+
+    final body = {
+      if (isValidEmail(login)) 'email': login,
+      if (!isValidEmail(login)) 'login': login,
+      'password': password,
+    };
 
     print('Request: POST $endpoint');
     print('Body: ${json.encode(body)}');
@@ -57,7 +68,7 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   Future<int> getUserRole() async {
-    final endpoint = '/user/me';
+    const endpoint = '/user/me';
 
     print('Request: GET $endpoint');
 
@@ -79,12 +90,12 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   void handleLogin() async {
-    String email = _emailController.text;
+    String login = _loginController.text;
     String password = _passwordController.text;
 
-    if (email.isEmpty) {
-      print('Displaying overlay with message: Вы не ввели почту');
-      MessageOverlayManager.showMessageOverlay("Вы не ввели почту", "Понятно");
+    if (login.isEmpty) {
+      print('Displaying overlay with message: Вы не ввели почту или логин');
+      MessageOverlayManager.showMessageOverlay("Вы не ввели почту или логин", "Понятно");
       return;
     }
 
@@ -94,7 +105,7 @@ class _LoginPageState extends State<LoginPage> {
       return;
     }
 
-    int authResult = await authenticateUser(email, password);
+    int authResult = await authenticateUser(login, password);
 
     if (authResult == 0) {
       print('Displaying overlay with message: Не удалось найти такого пользователя');
@@ -104,7 +115,7 @@ class _LoginPageState extends State<LoginPage> {
       if (roleResult == 2) {
         widget.onPageChange(PageType.moderator_profile_page);
       } else if (roleResult == 1) {
-        widget.onPageChange(PageType.filters_page);
+        widget.onPageChange(PageType.user_page);
       } else {
         MessageOverlayManager.showMessageOverlay("Ошибка получения данных пользователя", "Понятно");
       }
@@ -131,11 +142,11 @@ class _LoginPageState extends State<LoginPage> {
                 textAlign: TextAlign.center,
               ),
               DefaultTextField(
-                hintText: 'E-Mail',
-                controller: _emailController,
+                hintText: 'E-Mail или Логин',
+                controller: _loginController,
                 keyboardType: TextInputType.emailAddress,
               ),
-              DefaultTextField(
+              PasswordTextField(
                 hintText: 'Пароль',
                 controller: _passwordController,
                 keyboardType: TextInputType.text,
@@ -147,7 +158,7 @@ class _LoginPageState extends State<LoginPage> {
               SubButton(
                 text: 'Назад',
                 onPressed: () {
-                  widget.onPageChange(PageType.authorization_page);
+                  widget.goBack();
                 },
               ),
             ],

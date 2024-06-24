@@ -6,7 +6,7 @@
 
 import 'package:flutter/material.dart';
 import 'navigation_bars/userNavigationBar.dart';
-import 'navigation_bars/maderatorNavigationBar.dart'; // !!!!!!!!!!!!!!!!!!!!
+import 'navigation_bars/moderatorNavigationBar.dart';
 import 'ads/advertisementBar.dart';
 import 'controllers/NavigationController.dart';
 import 'controllers/pageSettings.dart';
