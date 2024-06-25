@@ -1,9 +1,3 @@
-/*
-  Login page
-
-  Asks to enter user's e-mail and password to enter the account
-*/
-
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'dart:convert';
@@ -53,16 +47,13 @@ class _LoginPageState extends State<LoginPage> {
       final responseData = json.decode(response.body);
       await TokenStorage.saveToken(responseData['token']);
       return 1;
+    } else if (response.statusCode == 401) {
+      // Unauthorized - Invalid login or password
+      MessageOverlayManager.showMessageOverlay("Неверный логин или пароль", "Понятно");
+      return 0;
     } else {
-      try {
-        final errorData = json.decode(response.body);
-        String errorMessage = 'Ошибка ${response.statusCode}: ${errorData['message'] ?? 'Неизвестная ошибка'}';
-        print('Displaying overlay with message: $errorMessage');
-        MessageOverlayManager.showMessageOverlay(errorMessage, "Понятно");
-      } catch (e) {
-        print('Displaying overlay with message: Ошибка ${response.statusCode}: ${response.body}');
-        MessageOverlayManager.showMessageOverlay('Ошибка ${response.statusCode}: ${response.body}', "Понятно");
-      }
+      // Other errors
+      MessageOverlayManager.showMessageOverlay("Ошибка при входе. Пожалуйста, попробуйте еще раз", "Понятно");
       return 0;
     }
   }
@@ -107,10 +98,7 @@ class _LoginPageState extends State<LoginPage> {
 
     int authResult = await authenticateUser(login, password);
 
-    if (authResult == 0) {
-      print('Displaying overlay with message: Не удалось найти такого пользователя');
-      MessageOverlayManager.showMessageOverlay("Не удалось найти такого пользователя", "Понятно");
-    } else if (authResult == 1) {
+    if (authResult == 1) {
       int roleResult = await getUserRole();
       if (roleResult == 2) {
         widget.onPageChange(PageType.moderator_profile_page);
@@ -119,6 +107,9 @@ class _LoginPageState extends State<LoginPage> {
       } else {
         MessageOverlayManager.showMessageOverlay("Ошибка получения данных пользователя", "Понятно");
       }
+    } else {
+      print('Displaying overlay with message: Не удалось найти такого пользователя');
+      MessageOverlayManager.showMessageOverlay("Не удалось найти такого пользователя", "Понятно");
     }
   }
 
@@ -158,7 +149,7 @@ class _LoginPageState extends State<LoginPage> {
               SubButton(
                 text: 'Назад',
                 onPressed: () {
-                  widget.goBack();
+                  widget.onPageChange(PageType.authorization_page);
                 },
               ),
             ],

@@ -123,7 +123,8 @@ class _ReviewPageState extends State<ReviewPage> {
               MainButton(
                 text: 'Назад',
                 onPressed: () {
-                  widget.goBack();
+                  //widget.goBack();
+                  widget.onPageChange(PageType.notification_page);
                 },
               ),
             ],

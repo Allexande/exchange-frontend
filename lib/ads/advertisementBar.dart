@@ -7,7 +7,7 @@ class AdvertisementBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       color: Colors.amber,
-      height: 60, 
+      height: 80, 
       child: Center(child: Text('Ad Banner')),
     );
   }

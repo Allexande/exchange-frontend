@@ -97,4 +97,9 @@ static Future<http.Response> postRequest(String endpoint, Map<String, dynamic> b
 
     return response;
   }
+
+  static Future<bool> isAnonymous() async {
+    String token = await TokenStorage.getToken() ?? '';
+    return token.isEmpty;
+  }
 }

@@ -1,9 +1,9 @@
-import 'package:exchange/controllers/pagesList.dart';
-import 'package:exchange/models/house.dart';
 import 'package:flutter/material.dart';
 import 'dart:convert';
 import '../styles/theme.dart';
 import '../widgets/messageOverlay.dart';
+import '../controllers/pagesList.dart';
+import '../models/house.dart';
 import '../controllers/connectionController.dart';
 
 class CreateReviewPage extends StatefulWidget {
@@ -21,6 +21,7 @@ class _CreateReviewPageState extends State<CreateReviewPage> {
   final TextEditingController _reviewController = TextEditingController();
   int _selectedRating = 5;
   House? house;
+  int? currentUserId;
 
   @override
   void initState() {
@@ -31,24 +32,48 @@ class _CreateReviewPageState extends State<CreateReviewPage> {
             "Ошибка", "нужно выбрать дом на который вы оставляете отзыв");
       });
     } else {
+      loadCurrentUserId();
+    }
+  }
+
+  Future<void> loadCurrentUserId() async {
+    final response = await ConnectionController.getRequest('/user/me');
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      setState(() {
+        currentUserId = data['id'];
+      });
       loadHouseData(widget.houseId!);
+    } else {
+      showErrorOverlay(response);
     }
   }
 
   Future<void> loadHouseData(int houseId) async {
     final response = await ConnectionController.getRequest('/houses/$houseId');
     if (response.statusCode == 200) {
-      setState(() {
-        house = House.fromJson(json.decode(utf8.decode(response.bodyBytes)));
-      });
-    } else {
-      try {
-        final errorData = json.decode(utf8.decode(response.bodyBytes));
-        String errorMessage = 'Ошибка ${response.statusCode}: ${errorData['message'] ?? 'Неизвестная ошибка'}';
-        MessageOverlayManager.showMessageOverlay(errorMessage, "Понятно");
-      } catch (e) {
-        MessageOverlayManager.showMessageOverlay('Ошибка ${response.statusCode}: ${response.body}', "Понятно");
+      var houseData = House.fromJson(json.decode(utf8.decode(response.bodyBytes)));
+      if (houseData.user.id == currentUserId) {
+        MessageOverlayManager.showMessageOverlay(
+            "Ошибка", "Отзываться о своем доме нельзя");
+        widget.onPageChange(PageType.filters_page);
+      } else {
+        setState(() {
+          house = houseData;
+        });
       }
+    } else {
+      showErrorOverlay(response);
+    }
+  }
+
+  void showErrorOverlay(response) {
+    try {
+      final errorData = json.decode(response.body);
+      String errorMessage = 'Ошибка ${response.statusCode}: ${errorData['message'] ?? 'Неизвестная ошибка'}';
+      MessageOverlayManager.showMessageOverlay(errorMessage, "Понятно");
+    } catch (e) {
+      MessageOverlayManager.showMessageOverlay('Ошибка ${response.statusCode}: ${response.body}', "Понятно");
     }
   }
 
@@ -71,14 +96,7 @@ class _CreateReviewPageState extends State<CreateReviewPage> {
           "Отзыв успешно опубликован", "Понятно");
       widget.goBack();
     } else {
-      try {
-        final errorData = json.decode(utf8.decode(response.bodyBytes));
-        String errorMessage =
-            'Ошибка ${response.statusCode}: ${errorData['message'] ?? 'Неизвестная ошибка'}';
-        MessageOverlayManager.showMessageOverlay(errorMessage, "Понятно");
-      } catch (e) {
-        MessageOverlayManager.showMessageOverlay('Ошибка ${response.statusCode}: ${response.body}', "Понятно");
-      }
+      showErrorOverlay(response);
     }
   }
 
@@ -153,7 +171,10 @@ class _CreateReviewPageState extends State<CreateReviewPage> {
               SizedBox(height: 10),
               SubButton(
                 text: 'Назад',
-                onPressed: widget.goBack,
+                onPressed: () {
+                  widget.onPageChange(PageType.authorization_page);
+                },
+                //onPressed: widget.goBack,
               ),
             ],
           ),

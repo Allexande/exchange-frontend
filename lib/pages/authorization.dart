@@ -8,8 +8,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../styles/theme.dart';
-import '../widgets/messageOverlay.dart';
 import '../controllers/pagesList.dart';
+import '../controllers/connectionController.dart';
 
 class AuthorizationPage extends StatefulWidget {
   final void Function(PageType) onPageChange;
@@ -24,12 +24,14 @@ class _AuthorizationPageState extends State<AuthorizationPage> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      MessageOverlayManager.showMessageOverlay(
-        "Вы находитесь в тестовой отладочной версии приложения, некоторые функции могут быть недоступны",
-        "Понятно"
-      );
-    });
+    checkUserStatus();
+  }
+
+  Future<void> checkUserStatus() async {
+    bool isAnonymous = await ConnectionController.isAnonymous();
+    if (!isAnonymous) {
+      widget.onPageChange(PageType.user_page);
+    }
   }
 
   @override

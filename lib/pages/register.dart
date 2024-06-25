@@ -171,7 +171,8 @@ class _RegistrationPageState extends State<RegistrationPage> {
               SubButton(
                 text: 'Назад',
                 onPressed: () {
-                  widget.goBack();
+                  //widget.goBack();
+                  widget.onPageChange(PageType.authorization_page);
                 },
               ),
             ],

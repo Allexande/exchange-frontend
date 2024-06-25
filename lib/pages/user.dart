@@ -1,11 +1,14 @@
+import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'dart:typed_data';
-import 'package:flutter/material.dart';
 import '../styles/theme.dart';
 import '../models/user.dart' as user_model;
+import '../models/house.dart';
 import '../widgets/messageOverlay.dart';
 import '../controllers/pagesList.dart';
 import '../controllers/connectionController.dart';
+import '../widgets/houseCard/housesCardList.dart';
+import '../controllers/tokenStorage.dart';
 
 class UserProfilePage extends StatefulWidget {
   final void Function(PageType, {int? userId, int? reviewId, int? houseId}) onPageChange;
@@ -23,16 +26,43 @@ class _UserProfilePageState extends State<UserProfilePage> {
   bool isLoading = true;
   Uint8List? avatarImage;
   List<Map<String, dynamic>> userReviews = [];
-  List<Map<String, dynamic>> userHouses = [];
+  List<House> userHouses = [];
+  int? currentUserId;
 
   @override
   void initState() {
     super.initState();
-    loadUserData();
+    checkUserAuthorization();
+  }
+
+  Future<void> checkUserAuthorization() async {
+    bool isAnonymous = await ConnectionController.isAnonymous();
+    if (isAnonymous && widget.userId == null) {
+      MessageOverlayManager.showMessageOverlay(
+        "У незарегистрированного пользователя нет своего аккаунта, но самое время его создать!",
+        "Понятно"
+      );
+      widget.onPageChange(PageType.register_page);
+    } else {
+      await loadCurrentUserId();
+      await loadUserData();
+    }
+  }
+
+  Future<void> loadCurrentUserId() async {
+    final response = await ConnectionController.getRequest('/user/me');
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      setState(() {
+        currentUserId = data['id'];
+      });
+    } else {
+      print('Ошибка при загрузке текущего пользователя: ${response.body}');
+    }
   }
 
   Future<void> loadUserData() async {
-    final endpoint = widget.userId == null ? '/user/me' : '/user/${widget.userId}';
+    final endpoint = widget.userId == null ? '/user/me' : '/users/${widget.userId}';
     print('Requesting data from endpoint: $endpoint');
     final response = await ConnectionController.getRequest(endpoint);
 
@@ -56,10 +86,10 @@ class _UserProfilePageState extends State<UserProfilePage> {
       if (mounted) {
         setState(() {
           user = user_model.UserModel.fromJson(data);
-          isOwner = widget.userId == null;
+          isOwner = widget.userId == null || currentUserId == widget.userId;
           isLoading = false;
         });
-        loadAvatar();
+        await loadAvatar();
         loadUserReviews();
         loadUserHouses();
       }
@@ -81,20 +111,28 @@ class _UserProfilePageState extends State<UserProfilePage> {
     final response = await ConnectionController.getRequest(endpoint);
 
     if (response.statusCode == 200) {
-      setState(() {
-        avatarImage = base64Decode(response.body);
-      });
+      if (mounted) {
+        setState(() {
+          avatarImage = response.bodyBytes;
+        });
+      }
+    } else {
+      print('Ошибка при загрузке аватара: ${response.body}');
     }
   }
 
   Future<void> loadUserReviews() async {
-    final endpoint = '/users/${user!.id}/reviews';
+    final endpoint = '/users/${user!.id}/reviews-to-user';
     final response = await ConnectionController.getRequest(endpoint);
 
     if (response.statusCode == 200) {
-      setState(() {
-        userReviews = List<Map<String, dynamic>>.from(json.decode(utf8.decode(response.bodyBytes)));
-      });
+      if (mounted) {
+        setState(() {
+          userReviews = List<Map<String, dynamic>>.from(json.decode(utf8.decode(response.bodyBytes)));
+        });
+      }
+    } else {
+      MessageOverlayManager.showMessageOverlay("Ошибка при загрузке отзывов: ${response.body}", "Понятно");
     }
   }
 
@@ -103,9 +141,17 @@ class _UserProfilePageState extends State<UserProfilePage> {
     final response = await ConnectionController.getRequest(endpoint);
 
     if (response.statusCode == 200) {
-      setState(() {
-        userHouses = List<Map<String, dynamic>>.from(json.decode(utf8.decode(response.bodyBytes)));
-      });
+      List<dynamic> responseData = json.decode(utf8.decode(response.bodyBytes));
+      if (mounted) {
+        setState(() {
+          userHouses = responseData
+              .where((houseData) => houseData['status'] == 'MODERATED')
+              .map((houseData) => House.fromJson(houseData))
+              .toList();
+        });
+      }
+    } else {
+      MessageOverlayManager.showMessageOverlay("Ошибка при загрузке домов: ${response.body}", "Понятно");
     }
   }
 
@@ -113,7 +159,17 @@ class _UserProfilePageState extends State<UserProfilePage> {
     if (avatarImage != null) {
       return CircleAvatar(
         radius: 60,
-        backgroundImage: MemoryImage(avatarImage!),
+        backgroundColor: Colors.transparent,
+        child: ClipOval(
+          child: SizedBox(
+            width: 120,
+            height: 120,
+            child: Image.memory(
+              avatarImage!,
+              fit: BoxFit.cover,
+            ),
+          ),
+        ),
       );
     } else {
       return Column(
@@ -132,40 +188,53 @@ class _UserProfilePageState extends State<UserProfilePage> {
         Text('Отзывы:', style: TextStyles.subHeadline),
         userReviews.isEmpty
             ? Text('Отсутствуют', textAlign: TextAlign.center, style: TextStyles.mainText)
-            : Column(
-                children: userReviews.map((review) {
-                  return GestureDetector(
-                    onTap: () {
-                      widget.onPageChange(PageType.review_page, reviewId: review['id']);
-                    },
-                    child: Card(
-                      margin: EdgeInsets.symmetric(vertical: 10),
-                      child: Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Рейтинг: ${review['rating']}',
-                                    style: TextStyles.smallHeadline,
-                                  ),
-                                  SizedBox(height: 5),
-                                  Text(
-                                    review['description'] ?? '',
-                                    style: TextStyles.mainText,
-                                  ),
-                                ],
+            : Container(
+                height: 200, // Установите высоту контейнера
+                child: ListView(
+                  children: userReviews.map((review) {
+                    return GestureDetector(
+                      onTap: () {
+                        widget.onPageChange(PageType.review_page, reviewId: review['id']);
+                      },
+                      child: Card(
+                        margin: EdgeInsets.symmetric(vertical: 10),
+                        child: Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Рейтинг: ${review['rating']}',
+                                      style: TextStyles.smallHeadline,
+                                    ),
+                                    SizedBox(height: 5),
+                                    Text(
+                                      review['description'] ?? '',
+                                      style: TextStyles.mainText,
+                                    ),
+                                    SizedBox(height: 10),
+                                    Text(
+                                      'Дом: ${review['houseResponse']['city']}, ${review['houseResponse']['address']}',
+                                      style: TextStyles.mainText,
+                                    ),
+                                    SizedBox(height: 10),
+                                    Text(
+                                      'Пользователь: ${review['userDtoResponse']['name']} ${review['userDtoResponse']['surname']}',
+                                      style: TextStyles.mainText,
+                                    ),
+                                  ],
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
-                    ),
-                  );
-                }).toList(),
+                    );
+                  }).toList(),
+                ),
               ),
       ],
     );
@@ -175,51 +244,45 @@ class _UserProfilePageState extends State<UserProfilePage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Публикации:', style: TextStyles.subHeadline),
+        Text('Дома:', style: TextStyles.subHeadline),
         userHouses.isEmpty
             ? Text('Отсутствуют', textAlign: TextAlign.center, style: TextStyles.mainText)
-            : Column(
-                children: userHouses.map((house) {
-                  return GestureDetector(
-                    onTap: () {
-                      widget.onPageChange(PageType.declaration_page, houseId: house['id']);
-                    },
-                    child: Card(
-                      margin: EdgeInsets.symmetric(vertical: 10),
-                      child: Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    '${house['city']}, ${house['address']}',
-                                    style: TextStyles.smallHeadline,
-                                  ),
-                                  SizedBox(height: 5),
-                                  Text(
-                                    house['description'] ?? '',
-                                    style: TextStyles.mainText,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  );
-                }).toList(),
+            : Container(
+                height: 200, 
+                child: HousesCardList(
+                  houses: userHouses,
+                  onTap: (houseId) {
+                    widget.onPageChange(PageType.declaration_page, houseId: houseId);
+                  },
+                ),
               ),
       ],
     );
   }
 
-  void _logout() {
-    // TODO Clear token
+  Widget _buildContactsSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Контакты:', style: TextStyles.subHeadline),
+        Text(user!.description?.isEmpty ?? true
+            ? 'Пользователь не оставил контактов'
+            : user!.description!,
+            textAlign: TextAlign.left,
+            style: TextStyles.mainText,
+        ),
+      ],
+    );
+  }
+
+  void _logout() async {
+    await TokenStorage.clear();
     widget.onPageChange(PageType.login_page);
+  }
+
+  @override
+  void dispose() {
+    super.dispose();
   }
 
   @override
@@ -245,8 +308,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
                             textAlign: TextAlign.center,
                           ),
                           SizedBox(height: 20),
-                          Text('Контакты:', style: TextStyles.subHeadline),
-                          Text(user!.description ?? '', textAlign: TextAlign.left, style: TextStyles.mainText),
+                          _buildContactsSection(),
                           SizedBox(height: 20),
                           _buildReviewsSection(),
                           SizedBox(height: 20),
@@ -255,24 +317,34 @@ class _UserProfilePageState extends State<UserProfilePage> {
                           if (isOwner)
                             Column(
                               children: [
-                                MainButton(
-                                  text: 'Редактировать',
-                                  onPressed: () {
-                                    widget.onPageChange(PageType.redact_page);
-                                  },
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: MainButton(
+                                    text: 'Редактировать',
+                                    onPressed: () {
+                                      widget.onPageChange(PageType.redact_page);
+                                    },
+                                  ),
                                 ),
-                                MainButton(
-                                  text: 'Выйти',
-                                  onPressed: _logout,
+                                SizedBox(height: 10),
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: SubButton(
+                                    text: 'Выйти',
+                                    onPressed: _logout,
+                                  ),
                                 ),
                               ],
                             )
                           else
-                            MainButton(
-                              text: 'Пожаловаться',
-                              onPressed: () {
-                                MessageOverlayManager.showMessageOverlay("Приложение пока что не может позволить увидеть всю информацию о чужом аккаунте", "Понятно");
-                              },
+                            SizedBox(
+                              width: double.infinity,
+                              child: MainButton(
+                                text: 'Пожаловаться',
+                                onPressed: () {
+                                  MessageOverlayManager.showMessageOverlay("Приложение пока что не может позволить увидеть всю информацию о чужом аккаунте", "Понятно");
+                                },
+                              ),
                             ),
                         ],
                       ),

@@ -49,7 +49,8 @@ class _ConfirmPageState extends State<ConfirmPage> {
               SubButton(
                 text: 'Назад',
                 onPressed: () {
-                  widget.goBack();
+                   widget.onPageChange(PageType.authorization_page);
+                  //widget.goBack();
                 },
               ),
             ],
