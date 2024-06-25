@@ -12,6 +12,7 @@ import '../widgets/messageOverlay.dart';
 import '../controllers/pagesList.dart';
 import '../models/house.dart';
 import '../controllers/connectionController.dart';
+import '../widgets/houseCard/housesCardList.dart';
 
 class SearchResultsPage extends StatefulWidget {
   final void Function(PageType, {String? city, DateTimeRange? dateRange, int? houseId}) onPageChange;
@@ -92,101 +93,20 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
             ),
             SizedBox(height: 8),
             Expanded(
-              child: ShaderMask(
-                shaderCallback: (Rect bounds) {
-                  return LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [Colors.white, Colors.transparent, Colors.transparent, Colors.white],
-                    stops: [0.0, 0.05, 0.95, 1.0],
-                  ).createShader(bounds);
-                },
-                blendMode: BlendMode.dstOut,
-                child: ListView.builder(
-                  itemCount: houses.length,
-                  itemBuilder: (context, index) {
-                    var item = houses[index];
-                    double rating = item.user.ratingSum / (item.user.totalReviews > 0 ? item.user.totalReviews : 1);
-                    String displayRating = rating == 0 ? '-' : rating.toStringAsFixed(1);
-                    return GestureDetector(
-                      onTap: () {
-                        widget.onPageChange(PageType.declaration_page, houseId: item.id);
-                      },
-                      child: Card(
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10.0),
-                        ),
-                        margin: EdgeInsets.symmetric(vertical: 8),
-                        color: AppColors.primary,
-                        child: Padding(
-                          padding: const EdgeInsets.all(16.0),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                item.city,
-                                style: TextStyle(
-                                  fontFamily: 'BloggerSans',
-                                  fontSize: 22,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppColors.background,
-                                ),
-                              ),
-                              if (widget.dateRange != null)
-                                Text(
-                                  "${DateFormat('dd.MM.yyyy').format(widget.dateRange!.start)} - ${DateFormat('dd.MM.yyyy').format(widget.dateRange!.end)}",
-                                  style: TextStyle(
-                                    fontFamily: 'BloggerSans',
-                                    fontSize: 16,
-                                    color: AppColors.background,
-                                  ),
-                                ),
-                              Text(
-                                item.address,
-                                style: TextStyle(
-                                  fontFamily: 'BloggerSans',
-                                  fontSize: 16,
-                                  color: AppColors.background,
-                                ),
-                              ),
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text(
-                                    item.description,
-                                    style: TextStyle(
-                                      fontFamily: 'BloggerSans',
-                                      fontSize: 16,
-                                      color: AppColors.background,
-                                    ),
-                                  ),
-                                  Row(
-                                    children: [
-                                      Icon(
-                                        Icons.star,
-                                        color: AppColors.secondary,
-                                      ),
-                                      SizedBox(width: 4),
-                                      Text(
-                                        displayRating,
-                                        style: TextStyle(
-                                          fontFamily: 'BloggerSans',
-                                          fontSize: 16,
-                                          color: AppColors.background,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
+              child: houses.isEmpty
+                  ? Center(
+                      child: Text(
+                        "Дома не найдены",
+                        style: TextStyles.mainText,
                       ),
-                    );
-                  },
-                ),
-              ),
+                    )
+                  : HousesCardList(
+                      houses: houses,
+                      dateRange: widget.dateRange,
+                      onTap: (houseId) {
+                        widget.onPageChange(PageType.declaration_page, houseId: houseId);
+                      },
+                    ),
             ),
             SizedBox(height: 8),
             SizedBox(

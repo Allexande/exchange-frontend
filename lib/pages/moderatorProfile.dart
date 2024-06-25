@@ -4,6 +4,7 @@ import 'dart:convert';
 import '../styles/theme.dart';
 import '../widgets/messageOverlay.dart';
 import '../controllers/connectionController.dart';
+import '../controllers/tokenStorage.dart';
 
 class ModerProfilePage extends StatefulWidget {
   final void Function(PageType) onPageChange;
@@ -38,6 +39,11 @@ class _ModerProfilePageState extends State<ModerProfilePage> {
     }
   }
 
+  void _logout() async {
+    await TokenStorage.clear();
+    widget.onPageChange(PageType.authorization_page);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -67,21 +73,29 @@ class _ModerProfilePageState extends State<ModerProfilePage> {
                       ),
                       SizedBox(height: 10),
                       Text(
-                        'Почта: ${profileData!['login']}',
+                        'Логин: ${profileData!['login']}',
+                        style: TextStyles.mainText,
+                      ),
+                      SizedBox(height: 10),
+                      Text(
+                        'Описание: ${profileData!['description']}',
                         style: TextStyles.mainText,
                       ),
                     ],
                   )
-                : CircularProgressIndicator(),
-            SubButton(
-              onPressed: () {
-                widget.onPageChange(PageType.authorization_page);
-              },
-              text: 'Выйти',
+                : Center(child: CircularProgressIndicator()),
+            SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              child: SubButton(
+                onPressed: () {
+                  _logout;
+                },
+                text: 'Выйти',
+              ),
             ),
           ],
         ),
-        
       ),
     );
   }

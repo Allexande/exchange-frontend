@@ -59,7 +59,7 @@ class _ModeratorNavigationBarState extends State<ModeratorNavigationBar> {
             child: Icon(
               Icons.person,
               color: selectedIndex == 0 ? AppColors.secondary : AppColors.background,
-              size: 30,
+              size: 40,
             ),
           ),
           label: '',
@@ -70,7 +70,7 @@ class _ModeratorNavigationBarState extends State<ModeratorNavigationBar> {
             child: Icon(
               Icons.report,
               color: selectedIndex == 1 ? AppColors.secondary : AppColors.background,
-              size: 30,
+              size: 40,
             ),
           ),
           label: '',
@@ -81,7 +81,7 @@ class _ModeratorNavigationBarState extends State<ModeratorNavigationBar> {
             child: Icon(
               Icons.list,
               color: selectedIndex == 2 ? AppColors.secondary : AppColors.background,
-              size: 30,
+              size: 40,
             ),
           ),
           label: '',

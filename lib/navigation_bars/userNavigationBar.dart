@@ -62,7 +62,7 @@ class _UserNavigationBarState extends State<UserNavigationBar> {
             child: Icon(
               Icons.person,
               color: selectedIndex == 0 ? AppColors.secondary : AppColors.background,
-              size: 30,
+              size: 40,
             ),
           ),
           label: '',
@@ -73,7 +73,7 @@ class _UserNavigationBarState extends State<UserNavigationBar> {
             child: Icon(
               Icons.search,
               color: selectedIndex == 1 ? AppColors.secondary : AppColors.background,
-              size: 30,
+              size: 40,
             ),
           ),
           label: '',
@@ -84,7 +84,7 @@ class _UserNavigationBarState extends State<UserNavigationBar> {
             child: Icon(
               Icons.check_circle,
               color: selectedIndex == 2 ? AppColors.secondary : AppColors.background,
-              size: 30,
+              size: 40,
             ),
           ),
           label: '',
@@ -95,7 +95,7 @@ class _UserNavigationBarState extends State<UserNavigationBar> {
             child: Icon(
               Icons.notifications,
               color: selectedIndex == 3 ? AppColors.secondary : AppColors.background,
-              size: 30,
+              size: 40,
             ),
           ),
           label: '',
