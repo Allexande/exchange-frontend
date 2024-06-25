@@ -23,6 +23,7 @@ class AuthorizationPage extends StatefulWidget {
 class _AuthorizationPageState extends State<AuthorizationPage> {
   @override
   void initState() {
+    /*
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       MessageOverlayManager.showMessageOverlay(
@@ -30,6 +31,7 @@ class _AuthorizationPageState extends State<AuthorizationPage> {
         "Понятно"
       );
     });
+    */
   }
 
   @override

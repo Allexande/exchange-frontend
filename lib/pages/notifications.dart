@@ -5,6 +5,7 @@ import '../widgets/messageOverlay.dart';
 import '../controllers/pagesList.dart';
 import '../controllers/connectionController.dart';
 import '../controllers/tokenStorage.dart';
+import '../widgets/dealCard/dealCardList.dart'; // Импортируйте виджет DealCardList
 
 class NotificationsPage extends StatefulWidget {
   final void Function(PageType, {int? houseId, int? givenHouseId, int? recievedHouseId}) onPageChange;
@@ -90,33 +91,10 @@ class _NotificationsPageState extends State<NotificationsPage> {
               )
             : Container(
                 height: 200,
-                child: ListView.builder(
-                  itemCount: deals.length,
-                  itemBuilder: (context, index) {
-                    var deal = deals[index];
-                    return InkWell(
-                      onTap: () {
-                        widget.onPageChange(PageType.deal_page, recievedHouseId: deal['receivedHouse']['id'], givenHouseId: deal['givenHouse']['id']);
-                      },
-                      child: Card(
-                        color: AppColors.primary,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10.0),
-                        ),
-                        margin: EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-                        child: ListTile(
-                          title: Text(
-                            deal["givenHouse"]["city"],
-                            style: TextStyles.subHeadline.copyWith(color: AppColors.background),
-                          ),
-                          subtitle: Text(
-                            'От ${deal["givenHouse"]["user"]["name"]} ${deal["givenHouse"]["user"]["surname"]}',
-                            style: TextStyles.mainText.copyWith(color: AppColors.background),
-                          ),
-                          trailing: Icon(Icons.swap_horiz, color: AppColors.background),
-                        ),
-                      ),
-                    );
+                child: DealCardList(
+                  deals: deals,
+                  onTap: (receivedHouseId, givenHouseId) {
+                    widget.onPageChange(PageType.deal_page, recievedHouseId: receivedHouseId, givenHouseId: givenHouseId);
                   },
                 ),
               ),

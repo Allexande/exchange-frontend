@@ -1,11 +1,15 @@
+import 'package:exchange/widgets/images/imageCarusel.dart';
 import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'dart:typed_data';
+import 'package:intl/intl.dart';
 import '../styles/theme.dart';
 import '../widgets/messageOverlay.dart';
 import '../controllers/pagesList.dart';
 import '../models/house.dart';
 import '../controllers/connectionController.dart';
+import '../widgets/userCard/userCard.dart';
+//import '../widgets/images/imageCarusel.dart';  
 
 class DealPage extends StatefulWidget {
   final void Function(PageType, {int? userId, int? houseId, int? givenHouseId, int? recievedHouseId, int? reviewId}) onPageChange;
@@ -20,7 +24,8 @@ class DealPage extends StatefulWidget {
 }
 
 class _DealPageState extends State<DealPage> {
-  String? dateRange;
+  String? startDate;
+  String? endDate;
   House? firstHouse;
   House? secondHouse;
   List<Uint8List> firstHouseImages = [];
@@ -63,16 +68,17 @@ class _DealPageState extends State<DealPage> {
     final dealResponse = await ConnectionController.getRequest('/houses/trades?givenHouseId=$givenHouseId&receivedHouseId=$recievedHouseId');
 
     if (houseResponse.statusCode == 200 && givenHouseResponse.statusCode == 200 && dealResponse.statusCode == 200) {
+      var deals = json.decode(utf8.decode(dealResponse.bodyBytes));
+      if (deals.isNotEmpty) {
+        var latestDeal = deals.last;
+        dealStatus = latestDeal['status'];
+        dealId = latestDeal['id'];
+        startDate = DateFormat('dd/MM/yyyy').format(DateTime.parse(latestDeal['startDate']));
+        endDate = DateFormat('dd/MM/yyyy').format(DateTime.parse(latestDeal['endDate']));
+      }
       setState(() {
         firstHouse = House.fromJson(json.decode(utf8.decode(houseResponse.bodyBytes)));
         secondHouse = House.fromJson(json.decode(utf8.decode(givenHouseResponse.bodyBytes)));
-        dateRange = "Дата сделки"; // Установите актуальную дату сделки
-        var deals = json.decode(utf8.decode(dealResponse.bodyBytes));
-        if (deals.isNotEmpty) {
-          var latestDeal = deals.last;
-          dealStatus = latestDeal['status'];
-          dealId = latestDeal['id'];
-        }
         loadHouseImages(widget.recievedHouseId, widget.givenHouseId);
         checkIfReviewed(widget.recievedHouseId);
       });
@@ -92,31 +98,46 @@ class _DealPageState extends State<DealPage> {
     final secondHouseImagesResponse = await ConnectionController.getRequest('/houses/$givenHouseId/images');
 
     if (firstHouseImagesResponse.statusCode == 200) {
-      setState(() {
-        firstHouseImages = List<Uint8List>.from(json.decode(firstHouseImagesResponse.body).map((image) => base64Decode(image['path'])));
-      });
-    } else {
-      try {
-        final errorData = json.decode(firstHouseImagesResponse.body);
-        String errorMessage = 'Ошибка ${firstHouseImagesResponse.statusCode}: ${errorData['message'] ?? 'Неизвестная ошибка'}';
-        MessageOverlayManager.showMessageOverlay(errorMessage, "Понятно");
-      } catch (e) {
-        MessageOverlayManager.showMessageOverlay('Ошибка ${firstHouseImagesResponse.statusCode}: ${firstHouseImagesResponse.body}', "Понятно");
+      List<String> imagePaths = List<String>.from(json.decode(firstHouseImagesResponse.body).map((image) => image['path']));
+      for (String path in imagePaths) {
+        final imageResponse = await ConnectionController.getRequest('/houses/$recievedHouseId/image?path=$path');
+        if (imageResponse.statusCode == 200) {
+          setState(() {
+            firstHouseImages.add(imageResponse.bodyBytes);
+          });
+        } else {
+          showErrorOverlay(imageResponse.body, imageResponse.statusCode);
+        }
       }
+    } else {
+      showErrorOverlay(firstHouseImagesResponse.body, firstHouseImagesResponse.statusCode);
     }
 
     if (secondHouseImagesResponse.statusCode == 200) {
-      setState(() {
-        secondHouseImages = List<Uint8List>.from(json.decode(secondHouseImagesResponse.body).map((image) => base64Decode(image['path'])));
-      });
-    } else {
-      try {
-        final errorData = json.decode(secondHouseImagesResponse.body);
-        String errorMessage = 'Ошибка ${secondHouseImagesResponse.statusCode}: ${errorData['message'] ?? 'Неизвестная ошибка'}';
-        MessageOverlayManager.showMessageOverlay(errorMessage, "Понятно");
-      } catch (e) {
-        MessageOverlayManager.showMessageOverlay('Ошибка ${secondHouseImagesResponse.statusCode}: ${secondHouseImagesResponse.body}', "Понятно");
+      List<String> imagePaths = List<String>.from(json.decode(secondHouseImagesResponse.body).map((image) => image['path']));
+      for (String path in imagePaths) {
+        final imageResponse = await ConnectionController.getRequest('/houses/$givenHouseId/image?path=$path');
+        if (imageResponse.statusCode == 200) {
+          setState(() {
+            secondHouseImages.add(imageResponse.bodyBytes);
+          });
+        } else {
+          showErrorOverlay(imageResponse.body, imageResponse.statusCode);
+        }
       }
+    } else {
+      showErrorOverlay(secondHouseImagesResponse.body, secondHouseImagesResponse.statusCode);
+    }
+  }
+
+  void showErrorOverlay(String responseBody, int statusCode) {
+    try {
+      final errorData = json.decode(responseBody);
+      String errorMessage = 'Ошибка $statusCode: ${errorData['message'] ?? 'Неизвестная ошибка'}';
+      MessageOverlayManager.showMessageOverlay(errorMessage, "Понятно");
+    } catch (e) {
+      String errorMessage = 'Ошибка $statusCode: $responseBody';
+      MessageOverlayManager.showMessageOverlay(errorMessage, "Понятно");
     }
   }
 
@@ -185,6 +206,24 @@ class _DealPageState extends State<DealPage> {
                           textAlign: TextAlign.center,
                         ),
                       ),
+                      if (startDate != null && endDate != null) ...[
+                        Padding(
+                          padding: const EdgeInsets.all(8.0),
+                          child: Text(
+                            'Начало сделки: $startDate',
+                            style: TextStyles.mainText,
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.all(8.0),
+                          child: Text(
+                            'Конец сделки: $endDate',
+                            style: TextStyles.mainText,
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      ],
                       SizedBox(height: 10),
                       _buildHouseSection(firstHouse!, 'Полученное жилье:', firstHouseImages),
                       SizedBox(height: 20),
@@ -213,11 +252,14 @@ class _DealPageState extends State<DealPage> {
                         Column(
                           children: [
                             if (!hasReviewed)
-                              MainButton(
-                                onPressed: () {
-                                  widget.onPageChange(PageType.create_review_page, houseId: secondHouse!.id);
-                                },
-                                text: 'Оставить отзыв',
+                              SizedBox(
+                                width: double.infinity,
+                                child: MainButton(
+                                  onPressed: () {
+                                    widget.onPageChange(PageType.create_review_page, houseId: secondHouse!.id);
+                                  },
+                                  text: 'Оставить отзыв',
+                                ),
                               )
                             else
                               Column(
@@ -291,7 +333,7 @@ class _DealPageState extends State<DealPage> {
           padding: const EdgeInsets.all(8.0),
           child: Text(
             title,
-            style: TextStyles.smallHeadline,
+            style: TextStyles.subHeadline,
             textAlign: TextAlign.center,
           ),
         ),
@@ -299,7 +341,7 @@ class _DealPageState extends State<DealPage> {
           padding: const EdgeInsets.all(8.0),
           child: Text(
             house.city,
-            style: TextStyles.subHeadline,
+            style: TextStyles.smallHeadline,
             textAlign: TextAlign.center,
           ),
         ),
@@ -312,21 +354,7 @@ class _DealPageState extends State<DealPage> {
                   textAlign: TextAlign.center,
                 ),
               )
-            : SizedBox(
-                height: 200,
-                child: PageView(
-                  children: houseImages.map((image) => Image.memory(image)).toList(),
-                ),
-              ),
-        if (dateRange != null)
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Text(
-              dateRange!,
-              style: TextStyles.mainText,
-              textAlign: TextAlign.center,
-            ),
-          ),
+            : ImageCarousel(images: houseImages), 
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 8.0),
           child: Text(
@@ -339,21 +367,11 @@ class _DealPageState extends State<DealPage> {
           onTap: () {
             widget.onPageChange(PageType.user_page, userId: house.user.id);
           },
-          child: ListTile(
-            leading: CircleAvatar(
-              backgroundColor: Colors.grey,
-              child: Icon(Icons.person, color: Colors.white),
-            ),
-            title: Text(
-              "${house.user.name} ${house.user.surname}",
-              textAlign: TextAlign.center,
-              style: TextStyles.subHeadline,
-            ),
-            subtitle: Text(
-              'Рейтинг: ${house.user.ratingSum}',
-              textAlign: TextAlign.center,
-              style: TextStyles.mainText,
-            ),
+          child: UserCard(
+            user: house.user,
+            onTap: () {
+              widget.onPageChange(PageType.user_page, userId: house.user.id);
+            },
           ),
         ),
       ],

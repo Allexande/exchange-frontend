@@ -1,12 +1,16 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 import '../styles/theme.dart';
 import '../widgets/messageOverlay.dart';
 import '../controllers/pagesList.dart';
 import 'data/cities.dart';
 import '../controllers/connectionController.dart';
+import '../controllers/tokenStorage.dart';
 
 class CreateDeclarationPage extends StatefulWidget {
   final void Function(PageType) onPageChange;
@@ -82,56 +86,65 @@ class _CreateDeclarationPageState extends State<CreateDeclarationPage> {
     });
   }
 
-  Future<void> _pickImage() async {
-    final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
+  final List<XFile> _selectedImages = [];
 
-    if (image != null) {
-      MessageOverlayManager.showMessageOverlay("По техническим причинам загрузка фотографий невозможна", "Понятно");
+  // Function for picking multiple images
+  Future<void> _pickImages() async {
+    final List<XFile>? images = await _picker.pickMultiImage();
+    if (images != null && images.isNotEmpty) {
+      setState(() {
+        _selectedImages.addAll(images);
+      });
     }
   }
 
+  // Function to submit the declaration
   Future<void> _submitDeclaration() async {
-    if (_descriptionController.text.isEmpty) {
-      MessageOverlayManager.showMessageOverlay("Описание не может быть пустым", "Понятно");
-      return;
-    }
-
-    if (selectedCity == null) {
-      MessageOverlayManager.showMessageOverlay("Вы не выбрали город", "Понятно");
-      return;
-    }
-
-    if (_addressController.text.isEmpty) {
-      MessageOverlayManager.showMessageOverlay("Адрес не может быть пустым", "Понятно");
+    if (_descriptionController.text.isEmpty || _addressController.text.isEmpty || selectedCity == null) {
+      MessageOverlayManager.showMessageOverlay("Все поля должны быть заполнены, включая изображения", "Понятно");
       return;
     }
 
     const endpoint = '/houses';
-
     final body = {
       'description': _descriptionController.text,
-      'city': selectedCity ?? 'Unknown',
+      'city': selectedCity!,
       'address': _addressController.text,
     };
 
-    print('Request Endpoint: $endpoint');
-    print('Request Body: $body');
-
     final response = await ConnectionController.postRequest(endpoint, body);
-
-    print('Response status: ${response.statusCode}');
-    print('Response body: ${response.body}');
-
     if (response.statusCode == 200) {
-      widget.onPageChange(PageType.results_page);
-    } else {
-      try {
-        final errorData = json.decode(response.body);
-        String errorMessage = 'Ошибка ${response.statusCode}: ${errorData['message'] ?? 'Неизвестная ошибка'}';
-        MessageOverlayManager.showMessageOverlay(errorMessage, "Понятно");
-      } catch (e) {
-        MessageOverlayManager.showMessageOverlay('Ошибка ${response.statusCode}: ${response.body}', "Понятно");
+      final houseId = json.decode(response.body)['id'];
+      if (_selectedImages.isNotEmpty) {
+        await _uploadHouseImages(houseId);  // Upload images after creating the declaration
       }
+      widget.onPageChange(PageType.filters_page); // Redirect to filters page
+    } else {
+      MessageOverlayManager.showMessageOverlay("Ошибка создания объявления: ${response.body}", "Понятно");
+    }
+  }
+
+  // Function to upload images
+  Future<void> _uploadHouseImages(int houseId) async {
+    final token = await TokenStorage.getToken(); // Get the token
+
+    var request = http.MultipartRequest('POST', Uri.parse('${ConnectionController.baseUrl}/houses/$houseId/images'));
+    request.headers['Authorization'] = '$token';
+    request.headers['Content-Type'] = 'multipart/form-data';
+
+    for (var image in _selectedImages) {
+      request.files.add(await http.MultipartFile.fromPath(
+        'files', image.path,
+        contentType: MediaType('image', 'jpeg'),
+      ));
+    }
+
+    var response = await request.send();
+    if (response.statusCode == 200) {
+      MessageOverlayManager.showMessageOverlay("Изображения успешно загружены", "ОК");
+    } else {
+      final responseBody = await response.stream.bytesToString();
+      MessageOverlayManager.showMessageOverlay("Ошибка загрузки изображений: $responseBody", "Понятно");
     }
   }
 
@@ -149,9 +162,29 @@ class _CreateDeclarationPageState extends State<CreateDeclarationPage> {
               textAlign: TextAlign.center,
             ),
             MainButton(
-              onPressed: _pickImage,
+              onPressed: _pickImages,
               text: 'Загрузить фото',
             ),
+            SizedBox(height: 10),
+            if (_selectedImages.isNotEmpty)
+              Container(
+                height: 200,
+                child: ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: _selectedImages.length,
+                  itemBuilder: (context, index) {
+                    return Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: Image.file(
+                        File(_selectedImages[index].path),
+                        fit: BoxFit.cover,
+                        width: 100,
+                        height: 100,
+                      ),
+                    );
+                  },
+                ),
+              ),
             SizedBox(height: 10),
             Stack(
               children: [

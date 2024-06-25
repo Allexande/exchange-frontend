@@ -158,7 +158,7 @@ class _LoginPageState extends State<LoginPage> {
               SubButton(
                 text: 'Назад',
                 onPressed: () {
-                  widget.goBack();
+                  widget.onPageChange(PageType.authorization_page);
                 },
               ),
             ],

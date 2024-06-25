@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:typed_data';
+import 'package:exchange/widgets/images/imageCarusel.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../styles/theme.dart';
@@ -7,6 +8,7 @@ import '../widgets/messageOverlay.dart';
 import '../controllers/pagesList.dart';
 import '../models/house.dart';
 import '../controllers/connectionController.dart';
+import '../widgets/userCard/userCard.dart';
 
 class DeclarationPage extends StatefulWidget {
   final int houseId;
@@ -25,6 +27,7 @@ class _DeclarationPageState extends State<DeclarationPage> {
   DateTimeRange? dateRange;
   List<House> userHouses = [];
   List<Uint8List> houseImages = [];
+  bool isLoading = true;
 
   @override
   void initState() {
@@ -39,8 +42,11 @@ class _DeclarationPageState extends State<DeclarationPage> {
       setState(() {
         house = houseData;
       });
-      loadUserData(houseData.user.id);
-      loadHouseImages();
+      await loadUserData(houseData.user.id);
+      await loadHouseImages();
+      setState(() {
+        isLoading = false;
+      });
     } else {
       showErrorOverlay(houseResponse.body, houseResponse.statusCode);
     }
@@ -72,13 +78,21 @@ class _DeclarationPageState extends State<DeclarationPage> {
   }
 
   Future<void> loadHouseImages() async {
-    final response = await ConnectionController.getRequest('/houses/${widget.houseId}/images');
-    if (response.statusCode == 200) {
-      setState(() {
-        houseImages = List<Uint8List>.from(json.decode(response.body).map((image) => base64Decode(image['path'])));
-      });
+    final imagePathsResponse = await ConnectionController.getRequest('/houses/${widget.houseId}/images');
+    if (imagePathsResponse.statusCode == 200) {
+      List<String> imagePaths = List<String>.from(json.decode(imagePathsResponse.body).map((image) => image['path']));
+      for (String path in imagePaths) {
+        final imageResponse = await ConnectionController.getRequest('/houses/${widget.houseId}/image?path=$path');
+        if (imageResponse.statusCode == 200) {
+          setState(() {
+            houseImages.add(imageResponse.bodyBytes);
+          });
+        } else {
+          showErrorOverlay(imageResponse.body, imageResponse.statusCode);
+        }
+      }
     } else {
-      showErrorOverlay(response.body, response.statusCode);
+      showErrorOverlay(imagePathsResponse.body, imagePathsResponse.statusCode);
     }
   }
 
@@ -151,175 +165,148 @@ class _DeclarationPageState extends State<DeclarationPage> {
     }
   }
 
-  Widget _buildHouseImages() {
-    if (houseImages.isEmpty) {
-      return Center(
-        child: Text(
-          'Фотографии для этого дома отсутствуют',
-          style: TextStyles.mainText,
-        ),
-      );
-    } else if (houseImages.length == 1) {
-      return Image.memory(
-        houseImages[0],
-        height: 200,
-      );
-    } else {
-      return SizedBox(
-        height: 200,
-        child: PageView(
-          children: houseImages.map((image) => Image.memory(image)).toList(),
-        ),
-      );
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: house == null
+      body: isLoading
           ? Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: <Widget>[
-                    Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: Text(
-                        'Предложение',
-                        style: TextStyles.mainHeadline,
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                    _buildHouseImages(),
-                    Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: Text(
-                        'Город',
-                        style: TextStyles.subHeadline,
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                      child: Text(
-                        safeDecode(house!.city),
-                        style: TextStyles.mainText,
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: Text(
-                        'Адрес',
-                        style: TextStyles.subHeadline,
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                      child: Text(
-                        safeDecode(house!.address),
-                        style: TextStyles.mainText,
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: Text(
-                        'Описание',
-                        style: TextStyles.subHeadline,
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                      child: Text(
-                        safeDecode(house!.description),
-                        style: TextStyles.mainText,
-                      ),
-                    ),
-                    InkWell(
-                      onTap: () {
-                        widget.onPageChange(PageType.user_page, userId: house!.user.id);
-                      },
-                      child: ListTile(
-                        leading: CircleAvatar(
-                          backgroundColor: Colors.grey,
-                          child: Icon(Icons.person, color: Colors.white),
-                        ),
-                        title: Text(
-                          "${safeDecode(house!.user.name)} ${safeDecode(house!.user.surname)}",
-                          style: TextStyles.subHeadline,
-                        ),
-                        subtitle: Text(
-                          'Рейтинг: ${house!.user.ratingSum}',
-                          style: TextStyles.mainText,
-                        ),
-                      ),
-                    ),
-                    isOwner
-                        ? MainButton(
-                            onPressed: deleteHouse,
-                            text: 'Удалить',
-                          )
-                        : Column(
-                            children: [
-                              GestureDetector(
-                                onTap: () => _selectDateRange(context),
-                                child: AbsorbPointer(
-                                  child: DefaultTextField(
-                                    hintText: dateRange == null
-                                        ? 'Выберите даты'
-                                        : '${DateFormat('dd/MM/yyyy').format(dateRange!.start)} - ${DateFormat('dd/MM/yyyy').format(dateRange!.end)}',
-                                    controller: TextEditingController(),
-                                    keyboardType: TextInputType.datetime,
-                                  ),
-                                ),
-                              ),
-                              SizedBox(height: 10),
-                              userHouses.isEmpty
-                                  ? Text(
-                                      'У вас нет ни одного дома, чтобы предложить его взамен',
-                                      textAlign: TextAlign.center,
-                                      style: TextStyles.mainText,
-                                    )
-                                  : ListView.builder(
-                                      shrinkWrap: true,
-                                      physics: NeverScrollableScrollPhysics(),
-                                      itemCount: userHouses.length,
-                                      itemBuilder: (context, index) {
-                                        final userHouse = userHouses[index];
-                                        return Card(
-                                          margin: EdgeInsets.symmetric(vertical: 10),
-                                          child: Padding(
-                                            padding: const EdgeInsets.all(16.0),
-                                            child: Column(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
-                                              children: [
-                                                Text(
-                                                  safeDecode(userHouse.city),
-                                                  style: TextStyles.smallHeadline,
-                                                ),
-                                                SizedBox(height: 5),
-                                                Text(
-                                                  safeDecode(userHouse.description),
-                                                  style: TextStyles.mainText,
-                                                ),
-                                                SizedBox(height: 10),
-                                                MainButton(
-                                                  onPressed: () => respondToHouse(userHouse.id),
-                                                  text: 'Использовать',
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        );
-                                      },
-                                    ),
-                            ],
+          : house == null
+              ? Center(child: Text("Ошибка при загрузке данных дома", style: TextStyles.mainText))
+              : SingleChildScrollView(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: <Widget>[
+                        Padding(
+                          padding: const EdgeInsets.all(8.0),
+                          child: Text(
+                            'Предложение',
+                            style: TextStyles.mainHeadline,
+                            textAlign: TextAlign.center,
                           ),
-                  ],
+                        ),
+                        houseImages.isNotEmpty
+                          ? ImageCarousel(images: houseImages)
+                          : Center(
+                              child: Text(
+                                'Фотографии для этого дома отсутствуют',
+                                style: TextStyles.mainText,
+                              ),
+                            ),
+                        Padding(
+                          padding: const EdgeInsets.all(8.0),
+                          child: Text(
+                            'Город',
+                            style: TextStyles.subHeadline,
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                          child: Text(
+                            safeDecode(house!.city),
+                            style: TextStyles.mainText,
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.all(8.0),
+                          child: Text(
+                            'Адрес',
+                            style: TextStyles.subHeadline,
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                          child: Text(
+                            safeDecode(house!.address),
+                            style: TextStyles.mainText,
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.all(8.0),
+                          child: Text(
+                            'Описание',
+                            style: TextStyles.subHeadline,
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                          child: Text(
+                            safeDecode(house!.description),
+                            style: TextStyles.mainText,
+                          ),
+                        ),
+                        UserCard(
+                          user: house!.user,
+                          onTap: () {
+                            widget.onPageChange(PageType.user_page, userId: house!.user.id);
+                          },
+                        ),
+                        isOwner
+                            ? MainButton(
+                                onPressed: deleteHouse,
+                                text: 'Удалить',
+                              )
+                            : Column(
+                                children: [
+                                  GestureDetector(
+                                    onTap: () => _selectDateRange(context),
+                                    child: AbsorbPointer(
+                                      child: DefaultTextField(
+                                        hintText: dateRange == null
+                                            ? 'Выберите даты'
+                                            : '${DateFormat('dd/MM/yyyy').format(dateRange!.start)} - ${DateFormat('dd/MM/yyyy').format(dateRange!.end)}',
+                                        controller: TextEditingController(),
+                                        keyboardType: TextInputType.datetime,
+                                      ),
+                                    ),
+                                  ),
+                                  SizedBox(height: 10),
+                                  userHouses.isEmpty
+                                      ? Text(
+                                          'У вас нет ни одного дома, чтобы предложить его взамен',
+                                          textAlign: TextAlign.center,
+                                          style: TextStyles.mainText,
+                                        )
+                                      : ListView.builder(
+                                          shrinkWrap: true,
+                                          physics: NeverScrollableScrollPhysics(),
+                                          itemCount: userHouses.length,
+                                          itemBuilder: (context, index) {
+                                            final userHouse = userHouses[index];
+                                            return Card(
+                                              margin: EdgeInsets.symmetric(vertical: 10),
+                                              child: Padding(
+                                                padding: const EdgeInsets.all(16.0),
+                                                child: Column(
+                                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                                  children: [
+                                                    Text(
+                                                      safeDecode(userHouse.city),
+                                                      style: TextStyles.smallHeadline,
+                                                    ),
+                                                    SizedBox(height: 5),
+                                                    Text(
+                                                      safeDecode(userHouse.description),
+                                                      style: TextStyles.mainText,
+                                                    ),
+                                                    SizedBox(height: 10),
+                                                    MainButton(
+                                                      onPressed: () => respondToHouse(userHouse.id),
+                                                      text: 'Использовать',
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            );
+                                          },
+                                        ),
+                                ],
+                              ),
+                      ],
+                    ),
+                  ),
                 ),
-              ),
-            ),
     );
   }
 }
